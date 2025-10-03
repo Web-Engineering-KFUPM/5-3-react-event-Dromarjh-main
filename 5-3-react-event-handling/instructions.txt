@@ -1,0 +1,81 @@
+React Lab – Task Tracker (Event Handling)
+  
+The goal is to understand how to:  
+- Capture user input using event handling.  
+- Wire basic event handlers to buttons (Submit, Delete, Clear All).  
+
+------------------------------------------------------------
+Setup
+------------------------------------------------------------
+1. Open VS Code and go to the terminal.  
+2. Move into the project folder by running:  
+   cd 5-3-react-event-handling  
+3. Install the required node modules by running:  
+   npm install or npm i  
+4. To see the output, start the development server by running:  
+   npm run dev  
+
+Note: In order to gain good marks in the lab, please follow the lab instructions strictly.  
+
+------------------------------------------------------------
+Task to write int the input field
+------------------------------------------------------------
+Enter these semester project tasks in the input:  
+- Make group  
+- Prepare proposal  
+- Make prototype  
+- Implement front-end  
+- Implement backend  
+- Deploy project  
+
+------------------------------------------------------------
+Task 1 – Capture Input
+------------------------------------------------------------
+1. In TaskApp.jsx, add an onChange handler to the input field.  
+2. Inside the handler, display the current text on the screen below the input field (instead of the console).  
+
+Hints:  
+- Use onChange on the input element.  
+- The event object gives the typed value at e.target.value.   
+- Example:  
+  <input onChange={(e) => /* pass e.target.value to TaskList */} />  
+
+------------------------------------------------------------
+Task 2 – Submit Button → Pass Props and Display
+------------------------------------------------------------
+1. In TaskApp.jsx, add an onClick handler to the Submit button.  
+2. When clicked, take the text from the input field and pass it as props to TaskList.  
+3. In TaskList.jsx, receive the props and pass them further down to TaskItem.  
+4. In TaskItem.jsx, display the task text inside the <span>.  
+
+Hints:  
+- Pass props like: <TaskList task={someText} />  
+- In TaskList.jsx: <TaskItem text={props.task} />  
+- In TaskItem.jsx: <span>{props.text}</span>  
+
+------------------------------------------------------------
+Task 3 – Delete Button
+------------------------------------------------------------
+1. In TaskItem.jsx, add an onClick handler to the Delete button.  
+2. When clicked, the selected task should be removed from the list on the screen (the <li> should disappear).  
+
+Hints:  
+- Use onClick on the Delete button inside TaskItem.  
+- You can pass a delete handler function from TaskApp → TaskList → TaskItem using props, and then call it inside TaskItem.  
+- Example idea:  
+  onClick={() => props.onDelete(props.text)}  
+- In the delete handler, remove that task from the list being displayed.  
+ 
+
+------------------------------------------------------------
+Task 4 – Clear All Button
+------------------------------------------------------------
+1. In TaskApp.jsx, add an onClick handler to the Clear All button.  
+2. When clicked, all the tasks that are currently shown in the list should be removed from the screen.  
+
+Hints:  
+- Use onClick on the Clear All button.  
+- You can create a function in TaskApp that removes all tasks and pass it to TaskList if needed.  
+- The simplest approach is to clear the array of tasks (or reset the props being passed) so that TaskList renders only the placeholder again.  
+
+
