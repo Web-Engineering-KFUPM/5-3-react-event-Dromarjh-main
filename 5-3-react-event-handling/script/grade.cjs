@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 /**
  * React Lab – Task Tracker (Event Handling)
- * Grader (CommonJS, ultra-lenient / no-state required)
+ * Grader (CommonJS) — attempt-aware, NO "grace" shown in report
  *
- * Tasks (80 pts): 4 × 20
- *   - Completeness 8, Correctness 6, Code Quality 6
- * Submission (20 pts): On time = 20, Late = 10
- * Floor: total task score >= 70/80 (submission excluded)
+ * Policy for tasks (out of 80):
+ * - No attempt:           0/80
+ * - Attempted (partial):  minimum 60/80
+ * - Fully complete:       award actual earned (up to 80/80)
  *
- * Looks only for top-level signals in:
- *   - TaskApp.jsx
- *   - TaskList.jsx
- *   - TaskItem.jsx
+ * Per task: Completeness 8, Correctness 6, Code Quality 6 = 20
+ * Submission: 20 (on time) / 10 (late)
+ * Report shows Achieved/Missed checks; DOES NOT mention boosts.
  */
 
 const fs = require("fs");
@@ -20,6 +19,8 @@ const fs = require("fs");
 const read = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
 const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
 const has = (txt, pattern) => (txt ? (pattern instanceof RegExp ? pattern.test(txt) : txt.includes(pattern)) : false);
+
+const nowIso = () => new Date().toISOString();
 const getCommitIso = () => {
   try {
     const p = process.env.GITHUB_EVENT_PATH;
@@ -37,7 +38,7 @@ const getCommitIso = () => {
     const iso = execSync("git log -1 --pretty=format:%cI", { encoding: "utf8" }).trim();
     if (iso) return new Date(iso).toISOString();
   } catch {}
-  return new Date().toISOString();
+  return nowIso();
 };
 const isLate = (dueIso, commitIso) => {
   try { return new Date(commitIso).getTime() > new Date(dueIso).getTime(); } catch { return false; }
@@ -45,10 +46,11 @@ const isLate = (dueIso, commitIso) => {
 
 // ---------- inputs ----------
 const FILES = {
-  app: ["src/TaskApp.jsx", "TaskApp.jsx"].find(exists),
-  list: ["src/TaskList.jsx", "TaskList.jsx"].find(exists),
-  item: ["src/TaskItem.jsx", "TaskItem.jsx"].find(exists),
+  app: ["src/components/TaskApp.jsx", "src/TaskApp.jsx", "TaskApp.jsx"].find(exists),
+  list: ["src/components/TaskList.jsx", "src/TaskList.jsx", "TaskList.jsx"].find(exists),
+  item: ["src/components/TaskItem.jsx", "src/TaskItem.jsx", "TaskItem.jsx"].find(exists),
 };
+
 const code = {
   app: read(FILES.app || ""),
   list: read(FILES.list || ""),
@@ -59,176 +61,235 @@ const code = {
 const DEFAULT_DUE_ISO = "2025-10-06T23:59:59+03:00";
 const DUE_DATE_ISO = process.env.DUE_DATE || DEFAULT_DUE_ISO;
 
-// ---------- scoring ----------
-const tasks = [
-  { name: "Task 1 (Capture Input)", total: 20, completeness: 0, correctness: 0, quality: 0, notes: [] },
-  { name: "Task 2 (Submit → Pass Props → Display)", total: 20, completeness: 0, correctness: 0, quality: 0, notes: [] },
-  { name: "Task 3 (Delete Button)", total: 20, completeness: 0, correctness: 0, quality: 0, notes: [] },
-  { name: "Task 4 (Clear All Button)", total: 20, completeness: 0, correctness: 0, quality: 0, notes: [] },
-];
-
-// ---------- Task 1 (no-state required) ----------
-(function () {
-  const t = tasks[0]; const a = code.app;
-
-  // Completeness (8): input present, onChange present, some display of typed value (even commented hint), file exists
-  let c = 0;
-  if (FILES.app) c += 2;
-  if (has(a, /<input[^>]*>/i)) c += 2;
-  if (has(a, /onChange\s*=\s*{[^}]+}/)) c += 2;
-  if (has(a, /\{[^}]*e\.target\.value[^}]*\}/) || has(a, /display|show|typed|current\s*text/i) || has(a, /<div[^>]*>\s*{[^}]+}\s*<\/div>/)) c += 2;
-  t.completeness = Math.min(8, c);
-
-  // Correctness (6): references e.target.value OR passes a variable from onChange
-  let k = 0;
-  if (has(a, /e\.target\.value/)) k += 4;
-  if (has(a, /onChange\s*=\s*{[^}]*}/)) k += 2;
-  t.correctness = Math.min(6, k);
-
-  // Code Quality (6): export default present; reasonable JSX structure
-  let q = 0;
-  if (has(a, /export\s+default/)) q += 3;
-  if (has(a, /return\s*\(\s*<section/i)) q += 3;
-  t.quality = Math.min(6, q);
-})();
-
-// ---------- Task 2 ----------
-(function () {
-  const t = tasks[1]; const a = code.app, l = code.list, i = code.item;
-
-  // Completeness (8): Submit button with onClick; TaskList exists; TaskItem referenced
-  let c = 0;
-  if (has(a, /<button[^>]*>[^<]*Submit[^<]*<\/button>/i)) c += 3;
-  if (has(a, /onClick\s*=\s*{[^}]+}/)) c += 2;
-  if (FILES.list && has(a, /<TaskList\b/i)) c += 2;
-  if (FILES.item && has(l, /<TaskItem\b/i)) c += 1;
-  t.completeness = Math.min(8, c);
-
-  // Correctness (6): prop flows App → List → Item; Item displays prop in span
-  let k = 0;
-  if (has(a, /<TaskList[^>]*\b(task|tasks|text|value)\s*=\s*{[^}]+}/)) k += 2;
-  if (has(l, /<TaskItem[^>]*\b(text|task)\s*=\s*{[^}]+}/)) k += 2;
-  if (has(i, /<span[^>]*>\s*{[^}]*\b(text|task)\b[^}]*}\s*<\/span>/)) k += 2;
-  t.correctness = Math.min(6, k);
-
-  // Code Quality (6): props destructuring in children, map+key suggested (even if single), exports present
-  let q = 0;
-  if (has(l, /function\s+\w+\s*\(\s*{\s*\w+/) || has(i, /function\s+\w+\s*\(\s*{\s*\w+/)) q += 2;
-  if (has(l, /\.map\s*\(/) && has(l, /key\s*=\s*{[^}]+}/)) q += 2;
-  if (has(l, /export\s+default/) && has(i, /export\s+default/)) q += 2;
-  t.quality = Math.min(6, q);
-})();
-
-// ---------- Task 3 ----------
-(function () {
-  const t = tasks[2]; const a = code.app, l = code.list, i = code.item;
-
-  // Completeness (8): Delete button + onClick in TaskItem; delete handler recognizable in props chain
-  let c = 0;
-  if (has(i, /<button[^>]*>[^<]*Delete|🗑️/i)) c += 3;
-  if (has(i, /onClick\s*=\s*{[^}]+}/)) c += 3;
-  if (has(l, /\bonDelete\b/) || has(i, /\bonDelete\b/) || has(a, /\bonDelete\b/)) c += 2;
-  t.completeness = Math.min(8, c);
-
-  // Correctness (6): calling onDelete in item; any removal hint (filter/splice/slice or comment)
-  let k = 0;
-  if (has(i, /onDelete\s*\(/) || has(i, /props\.onDelete/)) k += 3;
-  if (has(a, /filter\s*\(/) || has(l, /filter\s*\(/) || has(a, /splice\s*\(/) || has(l, /splice\s*\(/)) k += 3;
-  t.correctness = Math.min(6, k);
-
-  // Code Quality (6): clear imports/exports; simple, readable handlers
-  let q = 0;
-  if (has(i, /export\s+default/) || has(l, /export\s+default/)) q += 3;
-  if (!has(a, /\/\/\s*TODO\s*3/i) || !has(i, /\/\/\s*TODO\s*3/i)) q += 3; // nudges finishing the TODO
-  t.quality = Math.min(6, q);
-})();
-
-// ---------- Task 4 ----------
-(function () {
-  const t = tasks[3]; const a = code.app;
-
-  // Completeness (8): Clear All button + onClick in TaskApp
-  let c = 0;
-  if (has(a, /<button[^>]*>[^<]*Clear\s*All[^<]*<\/button>/i)) c += 4;
-  if (has(a, /onClick\s*=\s*{[^}]+}/)) c += 4;
-  t.completeness = Math.min(8, c);
-
-  // Correctness (6): any sign of clearing items (empty array literal, setting tasks prop to [], length=0, or commented plan)
-  let k = 0;
-  if (has(a, /\[\s*\]\s*\)/) || has(a, /\btasks\s*=\s*\[\s*\]/) || has(a, /length\s*=\s*0/)) k += 6;
-  t.correctness = Math.min(6, k);
-
-  // Code Quality (6): named/arrow function for the clear action + export default present
-  let q = 0;
-  if (has(a, /const\s+\w+\s*=\s*\(\)\s*=>\s*{/) || has(a, /function\s+\w+\s*\(/)) q += 3;
-  if (has(a, /export\s+default/)) q += 3;
-  t.quality = Math.min(6, q);
-})();
-
-// ---------- totals & floor ----------
-const perTask = tasks.map(t => ({
-  name: t.name,
-  completeness: t.completeness,
-  correctness: t.correctness,
-  quality: t.quality,
-  score: t.completeness + t.correctness + t.quality,
-}));
-let tasksTotal = perTask.reduce((s, x) => s + x.score, 0);
-
-// Floor ≥ 70/80 (tasks only)
-const FLOOR = 70;
-if (tasksTotal < FLOOR) {
-  let deficit = FLOOR - tasksTotal;
-  const caps = perTask.map(x => 20 - x.score);
-  while (deficit > 0 && caps.some(c => c > 0)) {
-    for (let i = 0; i < perTask.length && deficit > 0; i++) {
-      if (caps[i] > 0) { perTask[i].score += 1; caps[i] -= 1; deficit -= 1; }
-    }
+// ---------- scoring model ----------
+function runChecks(checks, maxPoints) {
+  // Each check: {desc, test: boolean, pts}
+  let earned = 0;
+  const achieved = [];
+  const missed = [];
+  for (const c of checks) {
+    if (c.test) { earned += c.pts; achieved.push(`✅ ${c.desc}`); }
+    else { missed.push(`❌ ${c.desc}`); }
   }
-  tasksTotal = perTask.reduce((s, x) => s + x.score, 0);
+  return {
+    earned: Math.min(maxPoints, earned),
+    achieved,
+    missed,
+    passedCount: achieved.length,
+    totalCount: checks.length,
+  };
 }
 
-// submission
+function taskSection(name, completeness, correctness, quality, finalScore) {
+  const lines = [];
+  lines.push(`### ${name} — ${finalScore}/20`);
+  lines.push(`- Completeness: ${completeness.earned}/8`);
+  lines.push(`- Correctness: ${correctness.earned}/6`);
+  lines.push(`- Code Quality: ${quality.earned}/6`);
+
+  if (completeness.achieved.length) {
+    lines.push(`\n**What you achieved (Completeness):**`);
+    lines.push(...completeness.achieved.map(s => `  - ${s}`));
+  }
+  if (completeness.missed.length) {
+    lines.push(`\n**What to improve (Completeness):**`);
+    lines.push(...completeness.missed.map(s => `  - ${s}`));
+  }
+
+  if (correctness.achieved.length) {
+    lines.push(`\n**What you achieved (Correctness):**`);
+    lines.push(...correctness.achieved.map(s => `  - ${s}`));
+  }
+  if (correctness.missed.length) {
+    lines.push(`\n**What to improve (Correctness):**`);
+    lines.push(...correctness.missed.map(s => `  - ${s}`));
+  }
+
+  if (quality.achieved.length) {
+    lines.push(`\n**What you achieved (Code Quality):**`);
+    lines.push(...quality.achieved.map(s => `  - ${s}`));
+  }
+  if (quality.missed.length) {
+    lines.push(`\n**What to improve (Code Quality):**`);
+    lines.push(...quality.missed.map(s => `  - ${s}`));
+  }
+
+  return lines.join("\n");
+}
+
+// ---------- Task checks (lenient, no state required) ----------
+
+// Task 1: Capture Input
+const t1Completeness = runChecks([
+  { desc: "An input field is present", test: has(code.app, /<input[^>]*>/i), pts: 3 },
+  { desc: "Input has an onChange handler", test: has(code.app, /onChange\s*=\s*{[^}]+}/), pts: 3 },
+  { desc: "Typed text is shown (preview or similar)", test: has(code.app, /typedPreview|You typed:|aria-live|preview/i), pts: 2 },
+], 8);
+const t1Correctness = runChecks([
+  { desc: "Change handler uses an event parameter (e or event)", test: has(code.app, /onChange\s*=\s*{\s*\(?(e|event)\)?\s*=>/), pts: 2 },
+  { desc: "Change handler reads e.target.value (or event.target.value)", test: has(code.app, /e\.target\.value|event\.target\.value/), pts: 2 },
+  { desc: "Rendered value appears in the DOM (textContent/innerHTML/JSX)", test: has(code.app, /textContent|innerHTML|\{[^}]*typed|You typed:/), pts: 2 },
+], 6);
+const t1Quality = runChecks([
+  { desc: "TaskApp is exported (export default)", test: has(code.app, /export\s+default/), pts: 3 },
+  { desc: "Clean JSX structure around input row", test: has(code.app, /<div\s+className="inputRow">[\s\S]*<\/div>/), pts: 3 },
+], 6);
+
+// Task 2: Submit → Pass Props → Display
+const t2Completeness = runChecks([
+  { desc: "A Submit button exists", test: has(code.app, /<button[^>]*>[^<]*Submit[^<]*<\/button>/i), pts: 3 },
+  { desc: "Submit button has an onClick handler", test: has(code.app, /onClick\s*=\s*{[^}]+}/), pts: 3 },
+  { desc: "TaskList is rendered from TaskApp", test: has(code.app, /<TaskList\b[^>]*>/), pts: 2 },
+], 8);
+const t2Correctness = runChecks([
+  { desc: "TaskApp passes any task-like prop to TaskList (or appends LI via DOM)", test: has(code.app, /<TaskList[^>]*(tasks|task|text|value)\s*=/) || has(code.app, /document\.createElement\(['"]li['"]\)/), pts: 3 },
+  { desc: "TaskList renders TaskItem (map or direct) OR UL receives appended children", test: has(code.list, /<TaskItem\b/) || has(code.list, /\.map\s*\(/) || has(code.app, /appendChild\(li\)/), pts: 3 },
+], 6);
+const t2Quality = runChecks([
+  { desc: "TaskList and TaskItem exported", test: has(code.list, /export\s+default/) && has(code.item, /export\s+default/), pts: 3 },
+  { desc: "If mapping, a key is used (or comments indicate intent)", test: has(code.list, /key\s*=\s*{[^}]+}/) || has(code.list, /map.*TaskItem/) || has(code.list, /TODO\s*2.*map/i), pts: 3 },
+], 6);
+
+// Task 3: Delete Button
+const t3Completeness = runChecks([
+  { desc: "Delete button present in TaskItem", test: has(code.item, /<button[^>]*>[^<]*Delete|🗑️/i), pts: 4 },
+  { desc: "Delete button wired (onClick or addEventListener)", test: has(code.item, /onClick\s*=\s*{[^}]+}/) || has(code.app, /addEventListener\(\s*['"]click['"]/), pts: 4 },
+], 8);
+const t3Correctness = runChecks([
+  { desc: "Deleting removes the matching item (removeChild / filter / splice / onDelete)", test: has(code.app, /removeChild|filter\s*\(|splice\s*\(/) || has(code.item, /onDelete\(|props\.onDelete/), pts: 6 },
+], 6);
+const t3Quality = runChecks([
+  { desc: "Components exported properly", test: has(code.item, /export\s+default/) || has(code.list, /export\s+default/), pts: 3 },
+  { desc: "Delete handler is a small function/arrow or listener", test: has(code.item, /const\s+\w+\s*=\s*\(\)\s*=>|function\s+\w+\s*\(/) || has(code.app, /addEventListener\(/), pts: 3 },
+], 6);
+
+// Task 4: Clear All
+const t4Completeness = runChecks([
+  { desc: "Clear All button exists", test: has(code.app, /<button[^>]*>[^<]*Clear\s*All[^<]*<\/button>/i), pts: 4 },
+  { desc: "Clear All button has onClick handler", test: has(code.app, /onClick\s*=\s*{[^}]+}/), pts: 4 },
+], 8);
+const t4Correctness = runChecks([
+  { desc: "Clear All empties the list (innerHTML='', [], or length=0)", test: has(code.app, /innerHTML\s*=\s*['"]{0,1}['"]{0,1}/) || has(code.app, /\btasks\s*=\s*\[\s*\]/) || has(code.app, /length\s*=\s*0/), pts: 6 },
+], 6);
+const t4Quality = runChecks([
+  { desc: "Clear handler defined as simple function/arrow", test: has(code.app, /const\s+\w+\s*=\s*\(\)\s*=>\s*{/) || has(code.app, /function\s+\w+\s*\(/), pts: 3 },
+  { desc: "TaskApp exported", test: has(code.app, /export\s+default/), pts: 3 },
+], 6);
+
+// ---------- compute raw per task ----------
+const perTaskRaw = [
+  { name: "Task 1 (Capture Input)", c: t1Completeness, k: t1Correctness, q: t1Quality },
+  { name: "Task 2 (Submit → Pass Props → Display)", c: t2Completeness, k: t2Correctness, q: t2Quality },
+  { name: "Task 3 (Delete Button)", c: t3Completeness, k: t3Correctness, q: t3Quality },
+  { name: "Task 4 (Clear All Button)", c: t4Completeness, k: t4Correctness, q: t4Quality },
+];
+
+let perTask = perTaskRaw.map(x => ({
+  name: x.name,
+  completeness: x.c.earned,
+  correctness: x.k.earned,
+  quality: x.q.earned,
+  raw: x.c.earned + x.k.earned + x.q.earned,
+  cDetail: x.c,
+  kDetail: x.k,
+  qDetail: x.q,
+}));
+
+let tasksTotalRaw = perTask.reduce((s, t) => s + t.raw, 0);
+
+// ---------- attempt policy ----------
+const attemptDetected =
+  has(code.app, /onChange\s*=\s*{[^}]+}/) ||
+  has(code.app, /onClick\s*=\s*{[^}]+}/) ||
+  has(code.item, /onClick\s*=\s*{[^}]+}/) ||
+  has(code.app, /addEventListener\(\s*['"]click['"]/) ||
+  has(code.app, /<TaskList\b/) ||
+  has(code.list, /<TaskItem\b/);
+
+const t1Full = t1Completeness.earned >= 7 && t1Correctness.earned >= 5;
+const t2Full = t2Completeness.earned >= 7 && t2Correctness.earned >= 5;
+const t3Full = t3Completeness.earned >= 7 && t3Correctness.earned >= 5;
+const t4Full = t4Completeness.earned >= 7 && t4Correctness.earned >= 5;
+const allFull = t1Full && t2Full && t3Full && t4Full;
+
+const MIN_ATTEMPT_TOTAL = 60;
+let tasksTotalFinal = tasksTotalRaw;
+
+if (!allFull && attemptDetected && tasksTotalRaw < MIN_ATTEMPT_TOTAL) {
+  // Raise total to 60/80 without exposing how; distribute silently
+  let deficit = MIN_ATTEMPT_TOTAL - tasksTotalRaw;
+  const room = perTask.map(t => 20 - t.raw);
+  while (deficit > 0 && room.some(r => r > 0)) {
+    for (let i = 0; i < perTask.length && deficit > 0; i++) {
+      if (room[i] > 0) {
+        perTask[i].raw += 1;   // silently bump final per-task score
+        room[i] -= 1;
+        deficit -= 1;
+      }
+    }
+  }
+  tasksTotalFinal = perTask.reduce((s, t) => s + t.raw, 0);
+}
+
+// ---------- submission ----------
 const commitIso = getCommitIso();
 const late = isLate(DUE_DATE_ISO, commitIso);
 const submissionPoints = late ? 10 : 20;
 
-// grand total
-const grandTotal = tasksTotal + submissionPoints;
-
 // ---------- report ----------
-function section(idx) {
-  const t = tasks[idx], s = perTask[idx];
-  const lines = [
-    `### ${s.name} — ${s.score}/20`,
-    `- Completeness: ${s.completeness}/8`,
-    `- Correctness: ${s.correctness}/6`,
-    `- Code Quality: ${s.quality}/6`,
-  ];
-  if (t.notes?.length) lines.push(`- Notes: ${t.notes.join(" ")}`);
-  return lines.join("\n");
-}
-
 const header = `# Auto Grade Report
 
 **Commit Time:** ${commitIso}
 **Due Date:** ${DUE_DATE_ISO}
-**Submission:** ${submissionPoints}/20 ${late ? "(Late submission detected)" : "(On time)"}
-
+**Submission:** ${submissionPoints}/20 ${late ? "(Late submission detected)" : "(On time)"}  
 `;
-const body = perTask.map((_, i) => section(i)).join("\n\n");
+
+const sections = perTask.map(t => {
+  return taskSection(
+    t.name,
+    t.cDetail,
+    t.kDetail,
+    t.qDetail,
+    t.raw // final per-task score shown; no mention of boosts
+  );
+}).join("\n\n");
+
 const totals = `
-
 ## Totals
-- Tasks Total: **${tasksTotal}/80**
+- Tasks Total: **${tasksTotalFinal}/80**
 - Submission: **${submissionPoints}/20**
-- **Grand Total: ${grandTotal}/100**
+- **Grand Total: ${tasksTotalFinal + submissionPoints}/100**
 `;
 
-const report = `${header}${body}${totals}\n`;
+const report = `${header}\n${sections}\n\n${totals}\n`;
+
+// Keep JSON minimal and student-friendly too (no boost fields).
 const json = {
-  commitIso, dueDateIso: DUE_DATE_ISO, late, submissionPoints,
-  tasks: perTask, tasksTotal, grandTotal,
+  commitIso,
+  dueDateIso: DUE_DATE_ISO,
+  late,
+  submissionPoints,
+  tasks: perTask.map(t => ({
+    name: t.name,
+    completeness: t.completeness,
+    correctness: t.correctness,
+    quality: t.quality,
+    final: t.raw,
+    achieved: {
+      completeness: t.cDetail.achieved,
+      correctness: t.kDetail.achieved,
+      quality: t.qDetail.achieved,
+    },
+    missed: {
+      completeness: t.cDetail.missed,
+      correctness: t.kDetail.missed,
+      quality: t.qDetail.missed,
+    },
+  })),
+  tasksTotal: tasksTotalFinal,
+  grandTotal: tasksTotalFinal + submissionPoints,
+  attemptDetected,        // informational only; no marks shown as "grace"
+  allTasksFullyComplete: allFull,
 };
 
 try { fs.writeFileSync("grade-report.md", report, "utf8"); } catch {}
