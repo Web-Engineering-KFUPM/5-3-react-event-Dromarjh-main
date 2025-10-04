@@ -1,0 +1,61 @@
+name: Auto Grade
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      due_date:
+        description: "Override ISO due date/time (default is 2025-10-06T23:59:59+03:00)"
+        required: false
+        default: ""
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set Due Date Env
+        run: |
+          if [ -n "${{ github.event.inputs.due_date }}" ]; then
+            echo "DUE_DATE=${{ github.event.inputs.due_date }}" >> $GITHUB_ENV
+          else
+            # Fixed due date: 6 Oct 2025, 23:59:59 Asia/Riyadh (UTC+03:00)
+            echo "DUE_DATE=2025-10-06T23:59:59+03:00" >> $GITHUB_ENV
+          fi
+
+      - name: Install deps (if any)
+        run: |
+          if [ -f package.json ]; then
+            npm ci || npm install
+          fi
+
+      - name: Run grader
+        env:
+          DUE_DATE: ${{ env.DUE_DATE }}
+        run: |
+          node grade.cjs | tee grade-console.txt
+
+      - name: Upload grading artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: grade
+          path: |
+            grade-report.md
+            grade.json
+            grade-console.txt
+
+      - name: Post summary
+        if: always()
+        run: |
+          if [ -f grade-report.md ]; then
+            echo "$(cat grade-report.md)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No grade report produced." >> $GITHUB_STEP_SUMMARY
+          fi
