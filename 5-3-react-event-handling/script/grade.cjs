@@ -14,6 +14,7 @@
  */
 
 const fs = require("fs");
+const path = require("path");
 
 // ---------- helpers ----------
 const read = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
@@ -44,11 +45,38 @@ const isLate = (dueIso, commitIso) => {
   try { return new Date(commitIso).getTime() > new Date(dueIso).getTime(); } catch { return false; }
 };
 
-// ---------- inputs ----------
+// ---------- robust file discovery ----------
+function findFirstFile(relCandidates, baseCandidates) {
+  for (const base of baseCandidates) {
+    for (const rel of relCandidates) {
+      const p = path.join(base, rel);
+      if (exists(p)) return p;
+    }
+  }
+  return null;
+}
+
+// likely bases (ordered)
+const BASES = [
+  path.resolve(__dirname, ".."),                        // …/5-3-react-event-handling
+  process.cwd(),                                       // workflow working dir (repo root)
+  path.resolve(process.cwd(), "5-3-react-event-handling"),
+  path.resolve(__dirname),                             // …/script (unlikely, but harmless)
+];
+
 const FILES = {
-  app: ["src/components/TaskApp.jsx", "src/TaskApp.jsx", "TaskApp.jsx"].find(exists),
-  list: ["src/components/TaskList.jsx", "src/TaskList.jsx", "TaskList.jsx"].find(exists),
-  item: ["src/components/TaskItem.jsx", "src/TaskItem.jsx", "TaskItem.jsx"].find(exists),
+  app: findFirstFile(
+    ["src/components/TaskApp.jsx", "src/TaskApp.jsx", "TaskApp.jsx"],
+    BASES
+  ),
+  list: findFirstFile(
+    ["src/components/TaskList.jsx", "src/TaskList.jsx", "TaskList.jsx"],
+    BASES
+  ),
+  item: findFirstFile(
+    ["src/components/TaskItem.jsx", "src/TaskItem.jsx", "TaskItem.jsx"],
+    BASES
+  ),
 };
 
 const code = {
@@ -241,7 +269,12 @@ const header = `# Auto Grade Report
 
 **Commit Time:** ${commitIso}
 **Due Date:** ${DUE_DATE_ISO}
-**Submission:** ${submissionPoints}/20 ${late ? "(Late submission detected)" : "(On time)"}  
+**Submission:** ${submissionPoints}/20 ${late ? "(Late submission detected)" : "(On time)"}
+
+**Files detected**
+- TaskApp: ${FILES.app || "NOT FOUND"}
+- TaskList: ${FILES.list || "NOT FOUND"}
+- TaskItem: ${FILES.item || "NOT FOUND"}
 `;
 
 const sections = perTask.map(t => {
@@ -263,12 +296,13 @@ const totals = `
 
 const report = `${header}\n${sections}\n\n${totals}\n`;
 
-// Keep JSON minimal and student-friendly too (no boost fields).
+// Student-friendly JSON (keeps detected file paths for debugging)
 const json = {
   commitIso,
   dueDateIso: DUE_DATE_ISO,
   late,
   submissionPoints,
+  files: FILES,
   tasks: perTask.map(t => ({
     name: t.name,
     completeness: t.completeness,
@@ -288,7 +322,7 @@ const json = {
   })),
   tasksTotal: tasksTotalFinal,
   grandTotal: tasksTotalFinal + submissionPoints,
-  attemptDetected,        // informational only; no marks shown as "grace"
+  attemptDetected,
   allTasksFullyComplete: allFull,
 };
 
