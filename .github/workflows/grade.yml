@@ -40,7 +40,14 @@ jobs:
         env:
           DUE_DATE: ${{ env.DUE_DATE }}
         run: |
-          node grade.cjs | tee grade-console.txt
+          node 5-3-react-event-handling/script/grade.cjs | tee grade-console.txt
+          # Copy outputs from script folder to repo root so artifacts & summary can find them
+          if [ -f 5-3-react-event-handling/script/grade-report.md ]; then
+            cp 5-3-react-event-handling/script/grade-report.md .
+          fi
+          if [ -f 5-3-react-event-handling/script/grade.json ]; then
+            cp 5-3-react-event-handling/script/grade.json .
+          fi
 
       - name: Upload grading artifacts
         uses: actions/upload-artifact@v4
