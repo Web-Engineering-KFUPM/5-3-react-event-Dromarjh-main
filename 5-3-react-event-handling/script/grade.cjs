@@ -108,39 +108,37 @@ function runChecks(checks, maxPoints) {
   };
 }
 
+// ---------- NEW: clearer task section formatting ----------
 function taskSection(name, completeness, correctness, quality, finalScore) {
   const lines = [];
-  lines.push(`### ${name} — ${finalScore}/20`);
-  lines.push(`- Completeness: ${completeness.earned}/8`);
-  lines.push(`- Correctness: ${correctness.earned}/6`);
-  lines.push(`- Code Quality: ${quality.earned}/6`);
 
-  if (completeness.achieved.length) {
-    lines.push(`\n**What you achieved (Completeness):**`);
-    lines.push(...completeness.achieved.map(s => `  - ${s}`));
-  }
-  if (completeness.missed.length) {
-    lines.push(`\n**What to improve (Completeness):**`);
-    lines.push(...completeness.missed.map(s => `  - ${s}`));
-  }
+  // Task heading
+  lines.push(`## ${name}`);
+  lines.push(`**Score:** ${finalScore}/20`);
+  lines.push("");
 
-  if (correctness.achieved.length) {
-    lines.push(`\n**What you achieved (Correctness):**`);
-    lines.push(...correctness.achieved.map(s => `  - ${s}`));
-  }
-  if (correctness.missed.length) {
-    lines.push(`\n**What to improve (Correctness):**`);
-    lines.push(...correctness.missed.map(s => `  - ${s}`));
-  }
+  // Helper to render each category consistently
+  const renderCategory = (title, detail, max) => {
+    const block = [];
+    block.push(`### ${title} — ${detail.earned}/${max}`);
+    if (detail.achieved.length) {
+      block.push("**What you achieved:**");
+      block.push(...detail.achieved.map(s => `- ${s}`));
+    } else {
+      block.push("_No checks achieved yet._");
+    }
+    if (detail.missed.length) {
+      block.push("**What to improve:**");
+      block.push(...detail.missed.map(s => `- ${s}`));
+    }
+    block.push(""); // spacer
+    return block.join("\n");
+  };
 
-  if (quality.achieved.length) {
-    lines.push(`\n**What you achieved (Code Quality):**`);
-    lines.push(...quality.achieved.map(s => `  - ${s}`));
-  }
-  if (quality.missed.length) {
-    lines.push(`\n**What to improve (Code Quality):**`);
-    lines.push(...quality.missed.map(s => `  - ${s}`));
-  }
+  // Ordered sections per your request
+  lines.push(renderCategory("Correctness", correctness, 6));
+  lines.push(renderCategory("Completeness", completeness, 8));
+  lines.push(renderCategory("Code Quality", quality, 6));
 
   return lines.join("\n");
 }
@@ -296,6 +294,7 @@ const header = `# Auto Grade Report
 - TaskItem: ${FILES.item || "NOT FOUND"}
 `;
 
+// NOTE: use real newlines ("\n"), not escaped "\\n"
 const sections = perTask.map(t => {
   return taskSection(
     t.name,
@@ -304,7 +303,7 @@ const sections = perTask.map(t => {
     t.qDetail,
     t.raw // final per-task score shown; no mention of boosts
   );
-}).join("\\n\\n");
+}).join("\n\n");
 
 const totals = `
 ## Totals
@@ -313,7 +312,7 @@ const totals = `
 - **Grand Total: ${tasksTotalFinal + submissionPoints}/100**
 `;
 
-const report = `${header}\\n${sections}\\n\\n${totals}\\n`;
+const report = `${header}\n${sections}\n\n${totals}\n`;
 
 // Student-friendly JSON (keeps detected file paths for debugging)
 const json = {
