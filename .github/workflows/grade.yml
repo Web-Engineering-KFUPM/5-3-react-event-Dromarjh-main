@@ -16,27 +16,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node
+      # Use Node with cache IF a lockfile exists anywhere we care about
+      - name: Use Node (cache)
+        if: ${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', '5-3-react-event-handling/**/package-lock.json', '5-3-react-event-handling/**/npm-shrinkwrap.json', '5-3-react-event-handling/**/yarn.lock') != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            npm-shrinkwrap.json
+            yarn.lock
+            5-3-react-event-handling/**/package-lock.json
+            5-3-react-event-handling/**/npm-shrinkwrap.json
+            5-3-react-event-handling/**/yarn.lock
+
+      # Fallback: Use Node without cache if no lockfile is present
+      - name: Use Node (no cache)
+        if: ${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', '5-3-react-event-handling/**/package-lock.json', '5-3-react-event-handling/**/npm-shrinkwrap.json', '5-3-react-event-handling/**/yarn.lock') == '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Set Due Date Env
         run: |
           if [ -n "${{ github.event.inputs.due_date }}" ]; then
             echo "DUE_DATE=${{ github.event.inputs.due_date }}" >> $GITHUB_ENV
           else
-            # Fixed due date: 6 Oct 2025, 23:59:59 Asia/Riyadh (UTC+03:00)
             echo "DUE_DATE=2025-10-06T23:59:59+03:00" >> $GITHUB_ENV
           fi
 
       - name: Install deps (if any)
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci || npm install
-          elif [ -f package.json ]; then
-            npm install
+          # Root-level project
+          if [ -f package.json ]; then
+            (npm ci || npm install)
+          fi
+          # Lab subfolder project
+          if [ -f 5-3-react-event-handling/package.json ]; then
+            pushd 5-3-react-event-handling
+            (npm ci || npm install)
+            popd
           fi
 
       - name: Run grader
@@ -58,7 +78,7 @@ jobs:
 
           node "$GRADER_PATH" | tee grade-console.txt
 
-          # Legacy copy (only if an older script wrote outputs in its own folder)
+          # Legacy copy if an old script writes in its own folder
           for p in \
             5-3-react-event-handling/script/grade-report.md \
             5-3-react-event-handling/script/grade.json; do
