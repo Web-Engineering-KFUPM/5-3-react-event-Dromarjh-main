@@ -21,7 +21,7 @@ By combining **state** and **event handling**, your Task Tracker will become ful
 
 ## Read Assignment
 Review the section on event handling in React:  
-[5.8 Event Handling](https://learn.zybooks.com/zybook/SWE363Fall2025/chapter/5/section/8)
+[5.8 Event Handling](https://learn.zybooks.com/zybook/SWE363Fall2025/chapter/5/section/8)<br>
 [5.9 State](https://learn.zybooks.com/zybook/SWE363Fall2025/chapter/5/section/9)
 
 ---
