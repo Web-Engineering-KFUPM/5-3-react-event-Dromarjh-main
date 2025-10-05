@@ -1,17 +1,18 @@
 import React from "react";
 
-export default function TaskItem(props) {
+export default function TaskItem({ id, text, onDelete }) {
   return (
     <li className="item">
-      {/* TODO 2: Display task text from props */}
-      <span className="item__text">{/* {props.text} */}</span>
+      {/* Task 2 – Display Task Text */}
+      <span className="item__text">{/* TODO: render text */}</span>
 
+      {/* Task 3 – Delete Button */}
       <div className="item__actions">
         <button
           className="iconBtn iconBtn--danger"
           aria-label="Delete task"
           title="Delete"
-          // TODO 3: Add onClick to delete this task from screen
+          // TODO: onClick={() => onDelete(id)}
         >
           🗑️
         </button>

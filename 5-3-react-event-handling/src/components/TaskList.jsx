@@ -1,20 +1,14 @@
 import React from "react";
 import TaskItem from "./TaskItem";
 
-export default function TaskList(props) {
+export default function TaskList({ tasks, onDelete }) {
   return (
     <ul className="list">
-      {/* TODO 2: Render TaskItem using props (map over tasks if multiple)
-          Example once props are wired:
-          {props.tasks?.map((t, i) => (
-            <TaskItem key={i} text={t} />
-          ))}
-      */}
+      {/* Task 2 – Display Placeholder if No Tasks Yet */}
+      {/* TODO: if (!tasks || tasks.length === 0) show placeholder <li> */}
 
-      {/* Placeholder so UI doesn’t look empty */}
-      <li className="list__placeholder">
-        Your tasks will appear here after Submit.
-      </li>
+      {/* Task 2 & 3 – Map tasks to TaskItem */}
+      {/* TODO: tasks.map(t => <TaskItem key={t.id} id={t.id} text={t.text} onDelete={onDelete} />) */}
     </ul>
   );
 }

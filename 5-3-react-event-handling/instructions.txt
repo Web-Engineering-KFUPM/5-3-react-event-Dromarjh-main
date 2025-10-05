@@ -1,8 +1,10 @@
-React Lab – Task Tracker (Event Handling)
+React Lab – Task Tracker (State + Event Handling)
   
 The goal is to understand how to:  
-- Capture user input using event handling.  
-- Wire basic event handlers to buttons (Submit, Delete, Clear All).  
+- Capture user input using React state and event handling.
+- Manage an array of tasks using useState.
+- Wire basic event handlers to buttons (Submit, Delete, Clear All).
+
 
 ------------------------------------------------------------
 Setup
@@ -31,51 +33,82 @@ Enter these semester project tasks in the input:
 ------------------------------------------------------------
 Task 1 – Capture Input
 ------------------------------------------------------------
-1. In TaskApp.jsx, add an onChange handler to the input field.  
-2. Inside the handler, display the current text on the screen below the input field (instead of the console).  
+1. In TaskApp.jsx, add an onChange handler to the input field.
+2. In TaskApp.jsx, use the React useState hook to create a state variable named text.
+   Example: const [text, setText] = useState("");  
+3. Bind the input field to this state so it becomes a controlled input.
+   - Use value={text} on the input element.
+   - Add an onChange handler that updates the state as the user types.
+4. Display the current value of text below the input field. 
 
 Hints:  
-- Use onChange on the input element.  
-- The event object gives the typed value at e.target.value.   
-- Example:  
-  <input onChange={(e) => /* pass e.target.value to TaskList */} />  
+- Use onChange on the input element to call setText(e.target.value).
+- Controlled input means React manages what appears in the input.
+
+Example:
+   <input
+   value={text}
+   onChange={(e) => setText(e.target.value)}
+   placeholder="Type a task..."
+   />
+   <p>{text}</p>  
 
 ------------------------------------------------------------
 Task 2 – Submit Button → Pass Props and Display
 ------------------------------------------------------------
-1. In TaskApp.jsx, add an onClick handler to the Submit button.  
-2. When clicked, take the text from the input field and pass it as props to TaskList.  
-3. In TaskList.jsx, receive the props and pass them further down to TaskItem.  
-4. In TaskItem.jsx, display the task text inside the <span>.  
+1. In TaskApp.jsx, create another state variable to hold all tasks:
+   Example: const [tasks, setTasks] = useState([]);
+2. When the Submit button is clicked, add the current input value (text) to this array as a new object { id, text }.
+3. After adding, clear the input field (setText to an empty string).
+4. Display the list of tasks by passing the tasks array as props to TaskList.
+5. In TaskList.jsx, loop through the array using .map() and display each task inside TaskItem.
+6. In TaskItem.jsx, show the text inside the <span>.
 
 Hints:  
-- Pass props like: <TaskList task={someText} />  
-- In TaskList.jsx: <TaskItem text={props.task} />  
-- In TaskItem.jsx: <span>{props.text}</span>  
+- Always update state immutably:
+   setTasks(prev => [...prev, { id: Date.now(), text }]);
+- Don’t allow empty submissions — check text.trim() before adding. 
+- Example idea:
+   <button onClick={handleSubmit}>Submit</button>
+   where handleSubmit updates both tasks and clears text.
 
 ------------------------------------------------------------
 Task 3 – Delete Button
 ------------------------------------------------------------
-1. In TaskItem.jsx, add an onClick handler to the Delete button.  
-2. When clicked, the selected task should be removed from the list on the screen (the <li> should disappear).  
+1. In TaskItem.jsx, add an onClick handler to the Delete button.
+2. When clicked, remove the selected task from the tasks array using the task’s unique id.
+3. To do this, define a delete handler in TaskApp.jsx and pass it down to TaskList and then to TaskItem through props.
+4. Inside TaskItem, call onDelete(id) when the Delete button is clicked.  
 
-Hints:  
-- Use onClick on the Delete button inside TaskItem.  
-- You can pass a delete handler function from TaskApp → TaskList → TaskItem using props, and then call it inside TaskItem.  
-- Example idea:  
-  onClick={() => props.onDelete(props.text)}  
-- In the delete handler, remove that task from the list being displayed.  
+Hints:
+- Use the array filter() method to remove a task:
+   setTasks(prev => prev.filter(t => t.id !== id));
+- Always use immutable updates — do not use .splice() or .push().
+   Example idea:
+      <button onClick={() => onDelete(id)}>Delete</button>
  
 
 ------------------------------------------------------------
 Task 4 – Clear All Button
 ------------------------------------------------------------
-1. In TaskApp.jsx, add an onClick handler to the Clear All button.  
-2. When clicked, all the tasks that are currently shown in the list should be removed from the screen.  
+1. In TaskApp.jsx, add an onClick handler to the Clear All button.
+2. When clicked, set the tasks array back to an empty array.
+3. This should make the task list disappear and show the placeholder message again in TaskList.jsx.
 
-Hints:  
-- Use onClick on the Clear All button.  
-- You can create a function in TaskApp that removes all tasks and pass it to TaskList if needed.  
-- The simplest approach is to clear the array of tasks (or reset the props being passed) so that TaskList renders only the placeholder again.  
+Hints:
+- Use:
+   setTasks([]);
+- You can add a function like handleClearAll in TaskApp and attach it to the button’s onClick.
+   Example idea:
+      <button onClick={handleClearAll}>Clear All</button>
+
+Extra Hints:
+- Each task should have a unique key (use task.id) when rendering in a list.
+- You can submit by pressing the Enter key — check onKeyDown for "Enter".
+- Don’t mutate the original tasks array — always return a new array from setTasks.
+- Keep your components small:
+   - TaskApp → holds state and handlers.
+   - TaskList → renders the list.
+   - TaskItem → displays a single task and Delete button.  
 
 
