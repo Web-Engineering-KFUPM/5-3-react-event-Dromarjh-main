@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * React Lab – Task Tracker (Event Handling)
- * Grader (CommonJS) — attempt-aware, NO "grace" shown in report
+ * React Lab – Task Tracker (State + Event Handling)
+ * Grader (CommonJS) — flexible, attempt-aware, state-focused
  *
- * Policy for tasks (out of 80):
- * - No attempt:           0/80
- * - Attempted (partial):  minimum 60/80
- * - Fully complete:       award actual earned (up to 80/80)
+ * Grading policy for tasks (out of 80):
+ * - No meaningful attempt (no state/events/components wired): 0/80
+ * - Attempted (partial):                                     minimum 60/80
+ * - Fully complete (all tasks strong):                        award actual earned (up to 80/80)
  *
  * Per task: Completeness 8, Correctness 6, Code Quality 6 = 20
  * Submission: 20 (on time) / 10 (late)
- * Report shows Achieved/Missed checks; DOES NOT mention boosts.
+ * Report shows Achieved/Missed checks and detailed feedback.
  */
 
 const fs = require("fs");
@@ -145,71 +145,77 @@ function taskSection(name, completeness, correctness, quality, finalScore) {
   return lines.join("\n");
 }
 
-// ---------- Task checks (lenient, no state required) ----------
+// ---------- Task checks (state-focused, top-level only) ----------
 
-// Task 1: Capture Input
+// Common state regexes
+const usesUseState = (name) => has(code.app, new RegExp(`\\[\\s*${name}\\s*,\\s*set${name.replace(/^./, c => c.toUpperCase())}\\s*\\]\\s*=\\s*useState\\s*\\(`));
+const usesTextState = usesUseState("text") || has(code.app, /\[\s*text\s*,\s*setText\s*\]\s*=\s*useState\s*\(/);
+const usesTasksState = usesUseState("tasks") || has(code.app, /\[\s*tasks\s*,\s*setTasks\s*\]\s*=\s*useState\s*\(/);
+
+// Task 1: Capture Input (controlled input with text state)
 const t1Completeness = runChecks([
-  { desc: "An input field is present", test: has(code.app, /<input[^>]*>/i), pts: 3 },
-  { desc: "Input has an onChange handler", test: has(code.app, /onChange\s*=\s*{[^}]+}/), pts: 3 },
-  { desc: "Typed text is shown (preview or similar)", test: has(code.app, /typedPreview|You typed:|aria-live|preview/i), pts: 2 },
+  { desc: "An input field is present", test: has(code.app, /<input[^>]*>/i), pts: 2 },
+  { desc: "Input is bound to state via value={text}", test: has(code.app, /value\s*=\s*{?\s*text\s*}?/), pts: 3 },
+  { desc: "Text state declared with useState", test: usesTextState, pts: 3 },
 ], 8);
 const t1Correctness = runChecks([
-  { desc: "Change handler uses an event parameter (e or event)", test: has(code.app, /onChange\s*=\s*{\s*\(?(e|event)\)?\s*=>/), pts: 2 },
-  { desc: "Change handler reads e.target.value (or event.target.value)", test: has(code.app, /e\.target\.value|event\.target\.value/), pts: 2 },
-  { desc: "Rendered value appears in the DOM (textContent/innerHTML/JSX)", test: has(code.app, /textContent|innerHTML|\{[^}]*typed|You typed:/), pts: 2 },
+  { desc: "Input has an onChange handler", test: has(code.app, /onChange\s*=\s*{[^}]+}/), pts: 2 },
+  { desc: "onChange reads e.target.value", test: has(code.app, /(\(|\s)(e|event)\)?\s*=>[\s\S]*?(e|event)\.target\.value/), pts: 2 },
+  { desc: "Current text value is rendered somewhere (preview/paragraph/etc.)", test: has(code.app, /\{?\s*text\s*\}?[^=]*<\/|You typed:|aria-live|preview/i), pts: 2 },
 ], 6);
 const t1Quality = runChecks([
-  { desc: "TaskApp is exported (export default)", test: has(code.app, /export\s+default/), pts: 3 },
+  { desc: "TaskApp component is exported (export default)", test: has(code.app, /export\s+default/), pts: 3 },
   { desc: "Clean JSX structure around input row", test: has(code.app, /<div\s+className="inputRow">[\s\S]*<\/div>/), pts: 3 },
 ], 6);
 
-// Task 2: Submit → Pass Props → Display
+// Task 2: Submit → Add to tasks state → Render list
 const t2Completeness = runChecks([
-  { desc: "A Submit button exists", test: has(code.app, /<button[^>]*>[^<]*Submit[^<]*<\/button>/i), pts: 3 },
-  { desc: "Submit button has an onClick handler", test: has(code.app, /onClick\s*=\s*{[^}]+}/), pts: 3 },
+  { desc: "Tasks state declared with useState([])", test: usesTasksState, pts: 3 },
+  { desc: "A Submit button exists with onClick", test: has(code.app, /<button[^>]*>\s*Submit\s*<\/button>/i) && has(code.app, /onClick\s*=\s*{[^}]+}/), pts: 3 },
   { desc: "TaskList is rendered from TaskApp", test: has(code.app, /<TaskList\b[^>]*>/), pts: 2 },
 ], 8);
 const t2Correctness = runChecks([
-  { desc: "TaskApp passes any task-like prop to TaskList (or appends LI via DOM)", test: has(code.app, /<TaskList[^>]*(tasks|task|text|value)\s*=/) || has(code.app, /document\.createElement\(['"]li['"]\)/), pts: 3 },
-  { desc: "TaskList renders TaskItem (map or direct) OR UL receives appended children", test: has(code.list, /<TaskItem\b/) || has(code.list, /\.map\s*\(/) || has(code.app, /appendChild\(li\)/), pts: 3 },
+  { desc: "Submit adds an object {id, text} immutably (setTasks(prev => [...prev, {...}]))", test: has(code.app, /setTasks\s*\(\s*prev\s*=>\s*\[\s*\.\.\.\s*prev\s*,\s*{[\s\S]*id[\s\S]*text[\s\S]*}\s*\]\s*\)/), pts: 3 },
+  { desc: "Input cleared after submit (setText(\"\") or setText(''))", test: has(code.app, /setText\s*\(\s*(['"])\1\s*\)/), pts: 2 },
+  { desc: "Empty submissions guarded (trim or length check)", test: has(code.app, /\.trim\s*\(\)\s*\)|if\s*\(\s*!?text\s*\)/), pts: 1 },
 ], 6);
 const t2Quality = runChecks([
   { desc: "TaskList and TaskItem exported", test: has(code.list, /export\s+default/) && has(code.item, /export\s+default/), pts: 3 },
-  { desc: "If mapping, a key is used (or comments indicate intent)", test: has(code.list, /key\s*=\s*{[^}]+}/) || has(code.list, /map.*TaskItem/) || has(code.list, /TODO\s*2.*map/i), pts: 3 },
+  { desc: "List rendering uses map with a stable key", test: has(code.list, /\.map\s*\(/) && has(code.list, /key\s*=\s*{[^}]+}/), pts: 3 },
 ], 6);
 
-// Task 3: Delete Button
+// Task 3: Delete Button → Remove from tasks (filter)
 const t3Completeness = runChecks([
-  { desc: "Delete button present in TaskItem", test: has(code.item, /<button[^>]*>[^<]*Delete|🗑️/i), pts: 4 },
-  { desc: "Delete button wired (onClick or addEventListener)", test: has(code.item, /onClick\s*=\s*{[^}]+}/) || has(code.app, /addEventListener\(\s*['"]click['"]/), pts: 4 },
+  { desc: "Delete button present in TaskItem", test: has(code.item, /<button[^>]*>(\s*🗑️|[^<]*Delete[^<]*)<\/button>/i), pts: 4 },
+  { desc: "Delete button wired via onClick", test: has(code.item, /onClick\s*=\s*{[^}]+}/), pts: 4 },
 ], 8);
 const t3Correctness = runChecks([
-  { desc: "Deleting removes the matching item (removeChild / filter / splice / onDelete)", test: has(code.app, /removeChild|filter\s*\(|splice\s*\(/) || has(code.item, /onDelete\(|props\.onDelete/), pts: 6 },
+  { desc: "Delete removes matching task using filter / onDelete(id)", test: has(code.app, /setTasks\s*\(\s*prev\s*=>\s*prev\.filter\s*\(\s*\w+\s*=>/) || has(code.item, /onDelete\s*\(\s*id\s*\)|onDelete\(\s*\w+\s*\)/), pts: 6 },
 ], 6);
 const t3Quality = runChecks([
+  { desc: "Delete handler is concise and readable", test: has(code.item, /onClick\s*=\s*{\s*\(\)\s*=>|onClick\s*=\s*{\s*\(\s*.*\s*\)\s*=>/), pts: 3 },
   { desc: "Components exported properly", test: has(code.item, /export\s+default/) || has(code.list, /export\s+default/), pts: 3 },
-  { desc: "Delete handler is a small function/arrow or listener", test: has(code.item, /const\s+\w+\s*=\s*\(\)\s*=>|function\s+\w+\s*\(/) || has(code.app, /addEventListener\(/), pts: 3 },
 ], 6);
 
-// Task 4: Clear All
+// Task 4: Clear All → Reset tasks state
 const t4Completeness = runChecks([
   { desc: "Clear All button exists", test: has(code.app, /<button[^>]*>[^<]*Clear\s*All[^<]*<\/button>/i), pts: 4 },
   { desc: "Clear All button has onClick handler", test: has(code.app, /onClick\s*=\s*{[^}]+}/), pts: 4 },
 ], 8);
 const t4Correctness = runChecks([
-  { desc: "Clear All empties the list (innerHTML='', [], or length=0)", test: has(code.app, /innerHTML\s*=\s*['"]{0,1}['"]{0,1}/) || has(code.app, /\btasks\s*=\s*\[\s*\]/) || has(code.app, /length\s*=\s*0/), pts: 6 },
+  { desc: "Clear All empties tasks via setTasks([])", test: has(code.app, /setTasks\s*\(\s*\[\s*\]\s*\)/) || has(code.app, /setTasks\s*\(\s*prev\s*=>\s*\[\s*\]\s*\)/), pts: 6 },
 ], 6);
 const t4Quality = runChecks([
-  { desc: "Clear handler defined as simple function/arrow", test: has(code.app, /const\s+\w+\s*=\s*\(\)\s*=>\s*{/) || has(code.app, /function\s+\w+\s*\(/), pts: 3 },
+  { desc: "Clear handler defined as a simple function/arrow", test: has(code.app, /const\s+\w+\s*=\s*\(\)\s*=>\s*{/) || has(code.app, /function\s+\w+\s*\(/), pts: 3 },
   { desc: "TaskApp exported", test: has(code.app, /export\s+default/), pts: 3 },
 ], 6);
 
 // ---------- compute raw per task ----------
 const perTaskRaw = [
-  { name: "Task 1 (Capture Input)", c: t1Completeness, k: t1Correctness, q: t1Quality },
-  { name: "Task 2 (Submit → Pass Props → Display)", c: t2Completeness, k: t2Correctness, q: t2Quality },
-  { name: "Task 3 (Delete Button)", c: t3Completeness, k: t3Correctness, q: t3Quality },
-  { name: "Task 4 (Clear All Button)", c: t4Completeness, k: t4Correctness, q: t4Quality },
+  { name: "Task 1 (Capture Input with State)", c: t1Completeness, k: t1Correctness, q: t1Quality },
+  { name: "Task 2 (Submit → Add to State → Display)", c: t2Completeness, k: t2Correctness, q: t2Quality },
+  { name: "Task 3 (Delete Task)", c: t3Completeness, k: t3Correctness, q: t3Quality },
+  { name: "Task 4 (Clear All Tasks)", c: t4Completeness, k: t4Correctness, q: t4Quality },
 ];
 
 let perTask = perTaskRaw.map(x => ({
@@ -225,32 +231,45 @@ let perTask = perTaskRaw.map(x => ({
 
 let tasksTotalRaw = perTask.reduce((s, t) => s + t.raw, 0);
 
-// ---------- attempt policy ----------
+// ---------- attempt policy (flexible) ----------
+const attemptSignals = [
+  /useState\s*\(/,
+  /value\s*=\s*{[^}]+}/,
+  /onChange\s*=\s*{[^}]+}/,
+  /onClick\s*=\s*{[^}]+}/,
+  /<TaskList\b/,
+  /<TaskItem\b/,
+  /setTasks\s*\(/,
+  /setText\s*\(/,
+];
 const attemptDetected =
-  has(code.app, /onChange\s*=\s*{[^}]+}/) ||
-  has(code.app, /onClick\s*=\s*{[^}]+}/) ||
-  has(code.item, /onClick\s*=\s*{[^}]+}/) ||
-  has(code.app, /addEventListener\(\s*['"]click['"]/) ||
-  has(code.app, /<TaskList\b/) ||
-  has(code.list, /<TaskItem\b/);
+  attemptSignals.some(rx => has(code.app, rx) || has(code.list, rx) || has(code.item, rx));
 
+// Task-level full completion heuristic (for transparency only)
 const t1Full = t1Completeness.earned >= 7 && t1Correctness.earned >= 5;
 const t2Full = t2Completeness.earned >= 7 && t2Correctness.earned >= 5;
 const t3Full = t3Completeness.earned >= 7 && t3Correctness.earned >= 5;
 const t4Full = t4Completeness.earned >= 7 && t4Correctness.earned >= 5;
 const allFull = t1Full && t2Full && t3Full && t4Full;
 
+// Apply flexible policy:
+// - If no meaningful attempt → 0/80 for tasks
+// - If attempted but below 60 → raise to 60/80 (distribute across tasks without mentioning boosts)
+// - If fully complete → show actual earned (no floor)
 const MIN_ATTEMPT_TOTAL = 60;
 let tasksTotalFinal = tasksTotalRaw;
 
-if (!allFull && attemptDetected && tasksTotalRaw < MIN_ATTEMPT_TOTAL) {
-  // Raise total to 60/80 without exposing how; distribute silently
+if (!attemptDetected) {
+  tasksTotalFinal = 0;
+  perTask = perTask.map(t => ({ ...t, raw: 0 }));
+} else if (!allFull && tasksTotalRaw < MIN_ATTEMPT_TOTAL) {
   let deficit = MIN_ATTEMPT_TOTAL - tasksTotalRaw;
   const room = perTask.map(t => 20 - t.raw);
+  // Distribute small bumps evenly to preserve relative weights
   while (deficit > 0 && room.some(r => r > 0)) {
     for (let i = 0; i < perTask.length && deficit > 0; i++) {
       if (room[i] > 0) {
-        perTask[i].raw += 1;   // silently bump final per-task score
+        perTask[i].raw += 1;
         room[i] -= 1;
         deficit -= 1;
       }
@@ -285,7 +304,7 @@ const sections = perTask.map(t => {
     t.qDetail,
     t.raw // final per-task score shown; no mention of boosts
   );
-}).join("\n\n");
+}).join("\\n\\n");
 
 const totals = `
 ## Totals
@@ -294,7 +313,7 @@ const totals = `
 - **Grand Total: ${tasksTotalFinal + submissionPoints}/100**
 `;
 
-const report = `${header}\n${sections}\n\n${totals}\n`;
+const report = `${header}\\n${sections}\\n\\n${totals}\\n`;
 
 // Student-friendly JSON (keeps detected file paths for debugging)
 const json = {
@@ -305,9 +324,6 @@ const json = {
   files: FILES,
   tasks: perTask.map(t => ({
     name: t.name,
-    completeness: t.completeness,
-    correctness: t.correctness,
-    quality: t.quality,
     final: t.raw,
     achieved: {
       completeness: t.cDetail.achieved,
@@ -328,4 +344,5 @@ const json = {
 
 try { fs.writeFileSync("grade-report.md", report, "utf8"); } catch {}
 try { fs.writeFileSync("grade.json", JSON.stringify(json, null, 2), "utf8"); } catch {}
+try { fs.writeFileSync("grader.js", fs.readFileSync(__filename, "utf8"), "utf8"); } catch {}
 console.log(report);

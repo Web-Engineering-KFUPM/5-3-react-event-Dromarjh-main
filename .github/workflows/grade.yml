@@ -20,6 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Set Due Date Env
         run: |
@@ -32,22 +33,39 @@ jobs:
 
       - name: Install deps (if any)
         run: |
-          if [ -f package.json ]; then
+          if [ -f package-lock.json ]; then
             npm ci || npm install
+          elif [ -f package.json ]; then
+            npm install
           fi
 
       - name: Run grader
         env:
           DUE_DATE: ${{ env.DUE_DATE }}
         run: |
-          node 5-3-react-event-handling/script/grade.cjs | tee grade-console.txt
-          # Copy outputs from script folder to repo root so artifacts & summary can find them
-          if [ -f 5-3-react-event-handling/script/grade-report.md ]; then
-            cp 5-3-react-event-handling/script/grade-report.md .
+          set -e
+          GRADER_PATH=""
+          if [ -f "5-3-react-event-handling/script/grader.js" ]; then
+            GRADER_PATH="5-3-react-event-handling/script/grader.js"
+          elif [ -f "5-3-react-event-handling/script/grade.cjs" ]; then
+            GRADER_PATH="5-3-react-event-handling/script/grade.cjs"
+          elif [ -f "scripts/grader.js" ]; then
+            GRADER_PATH="scripts/grader.js"
+          else
+            echo "No grader found at expected locations." >&2
+            exit 1
           fi
-          if [ -f 5-3-react-event-handling/script/grade.json ]; then
-            cp 5-3-react-event-handling/script/grade.json .
-          fi
+
+          node "$GRADER_PATH" | tee grade-console.txt
+
+          # Legacy copy (only if an older script wrote outputs in its own folder)
+          for p in \
+            5-3-react-event-handling/script/grade-report.md \
+            5-3-react-event-handling/script/grade.json; do
+            if [ -f "$p" ]; then
+              cp "$p" .
+            fi
+          done
 
       - name: Upload grading artifacts
         uses: actions/upload-artifact@v4
@@ -62,7 +80,7 @@ jobs:
         if: always()
         run: |
           if [ -f grade-report.md ]; then
-            echo "$(cat grade-report.md)" >> $GITHUB_STEP_SUMMARY
+            cat grade-report.md >> $GITHUB_STEP_SUMMARY
           else
             echo "No grade report produced." >> $GITHUB_STEP_SUMMARY
           fi
