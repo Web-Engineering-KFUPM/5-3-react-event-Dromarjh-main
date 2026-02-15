@@ -1,6 +1,6 @@
 # React Lab – Task Tracker (Event Handling)
 
-⚠️ **Note:** Please follow the `instructions.txt` file to implement the TODOs.
+⚠️ **Note:** Please follow the `app.jsx` file to implement the TODOs.
 This README file is only for the **overview of the lab** and the **concepts used**.
 
 ## Lab Overview
