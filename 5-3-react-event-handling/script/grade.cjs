@@ -320,7 +320,7 @@ function anyOf(has, res) {
 }
 
 /* -----------------------------
-   Grade TODOs (lenient)
+   Grade TODOs
 -------------------------------- */
 
 // Task 1: Controlled input + display typed text
@@ -337,18 +337,18 @@ function anyOf(has, res) {
 
     const required = [
       {
-        label: 'Creates text state with useState("") (lenient)',
+        label: 'Creates text state with useState("")',
         ok: anyOf(has, [
           /\bconst\s*\[\s*text\s*,\s*setText\s*\]\s*=\s*useState\s*\(\s*["'`]\s*["'`]\s*\)/i,
           /\buseState\s*\(\s*["'`]\s*["'`]\s*\)/i,
         ]),
       },
       {
-        label: "Input is controlled with value={text} (lenient)",
+        label: "Input is controlled with value={text}",
         ok: anyOf(has, [/\bvalue\s*=\s*\{\s*text\s*\}/i]),
       },
       {
-        label: "Input updates text via onChange -> setText(e.target.value) (lenient)",
+        label: "Input updates text via onChange -> setText(e.target.value)",
         ok: anyOf(has, [
           /\bonChange\s*=\s*\{\s*\(\s*\w+\s*\)\s*=>\s*setText\s*\(\s*\w+\s*\.target\.value\s*\)\s*\}/i,
           /\bonChange\s*=\s*\{\s*handleChange\s*\}/i, // allow helper fn name
@@ -356,7 +356,7 @@ function anyOf(has, res) {
         ]),
       },
       {
-        label: "Displays current text in JSX (e.g., <p>{text}</p>) (lenient)",
+        label: "Displays current text in JSX (e.g., <p>{text}</p>)",
         ok: anyOf(has, [/\{\s*text\s*\}/i]),
       },
     ];
@@ -382,11 +382,11 @@ function anyOf(has, res) {
 
     const required = [
       {
-        label: "Creates tasks state with useState([]) (lenient)",
+        label: "Creates tasks state with useState([])",
         ok: anyOf(hasA, [/\bconst\s*\[\s*tasks\s*,\s*setTasks\s*\]\s*=\s*useState\s*\(\s*\[\s*\]\s*\)/i]),
       },
       {
-        label: "handleSubmit adds a new task object to tasks immutably (setTasks([...prev, ...])) (lenient)",
+        label: "handleSubmit adds a new task object to tasks immutably (setTasks([...prev, ...]))",
         ok: anyOf(hasA, [
           /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
           /\bsetTasks\s*\(\s*prev\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
@@ -394,7 +394,7 @@ function anyOf(has, res) {
         ]),
       },
       {
-        label: "New task has id + text fields (Date.now or similar) (lenient)",
+        label: "New task has id + text fields (Date.now or similar)",
         ok: anyOf(hasA, [
           /\{\s*id\s*:\s*Date\.now\s*\(\s*\)\s*,\s*text\s*:\s*text/i,
           /\{\s*id\s*:\s*\w+\s*,\s*text\s*:\s*text/i,
@@ -402,19 +402,19 @@ function anyOf(has, res) {
         ]),
       },
       {
-        label: "Clears input after submit (setText('') or setText(\"\")) (lenient)",
+        label: "Clears input after submit (setText('') or setText(\"\"))",
         ok: anyOf(hasA, [/\bsetText\s*\(\s*["'`]\s*["'`]\s*\)/i]),
       },
       {
-        label: "Passes tasks to TaskList as props (tasks={tasks}) (lenient)",
+        label: "Passes tasks to TaskList as props (tasks={tasks})",
         ok: anyOf(hasA, [/<\s*TaskList[^>]*\btasks\s*=\s*\{\s*tasks\s*\}/i]),
       },
       {
-        label: "TaskList maps tasks to TaskItem (tasks.map(...)) (lenient)",
+        label: "TaskList maps tasks to TaskItem (tasks.map(...))",
         ok: anyOf(hasL, [/\btasks\s*\.\s*map\s*\(/i, /\.map\s*\(\s*\(\s*\w+\s*\)\s*=>/i]),
       },
       {
-        label: "TaskItem displays the task text (task.text) (lenient)",
+        label: "TaskItem displays the task text (task.text)",
         ok: anyOf(hasI, [/\btask\s*\.\s*text\b/i]),
       },
     ];
@@ -440,7 +440,7 @@ function anyOf(has, res) {
 
     const required = [
       {
-        label: "Defines a delete handler that filters tasks by id (lenient)",
+        label: "Defines a delete handler that filters tasks by id",
         ok: anyOf(hasA, [
           /\bhandleDelete\b/i,
           /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*prev\s*\.\s*filter\s*\(/i,
@@ -448,15 +448,15 @@ function anyOf(has, res) {
         ]),
       },
       {
-        label: "Passes onDelete to TaskList (onDelete={handleDelete}) (lenient)",
+        label: "Passes onDelete to TaskList (onDelete={handleDelete})",
         ok: anyOf(hasA, [/<\s*TaskList[^>]*\bonDelete\s*=\s*\{\s*handleDelete\s*\}/i]),
       },
       {
-        label: "TaskList passes onDelete to TaskItem (onDelete={onDelete}) (lenient)",
+        label: "TaskList passes onDelete to TaskItem (onDelete={onDelete})",
         ok: anyOf(hasL, [/<\s*TaskItem[^>]*\bonDelete\s*=\s*\{\s*onDelete\s*\}/i]),
       },
       {
-        label: "TaskItem delete button calls onDelete(task.id) (lenient)",
+        label: "TaskItem delete button calls onDelete(task.id)",
         ok: anyOf(hasI, [
           /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*task\s*\.\s*id\s*\)\s*\}/i,
           /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*\w+\s*\)\s*\}/i, // very lenient
@@ -483,15 +483,15 @@ function anyOf(has, res) {
 
     const required = [
       {
-        label: "Clear All handler resets tasks to empty array (setTasks([])) (lenient)",
+        label: "Clear All handler resets tasks to empty array (setTasks([]))",
         ok: anyOf(hasA, [/\bsetTasks\s*\(\s*\[\s*\]\s*\)/i]),
       },
       {
-        label: "Clear All button wired to handler (onClick={handleClearAll}) (lenient)",
+        label: "Clear All button wired to handler (onClick={handleClearAll})",
         ok: anyOf(hasA, [/\bonClick\s*=\s*\{\s*handleClearAll\s*\}/i]),
       },
       {
-        label: "TaskList shows placeholder when tasks is empty (lenient)",
+        label: "TaskList shows placeholder when tasks is empty",
         ok: anyOf(hasL, [
           /\btasks\s*\.\s*length\s*===\s*0/i,
           /!\s*tasks\s*\.\s*length/i,
