@@ -19,8 +19,7 @@ export default function TaskList({ tasks = [], onDelete }) {
       {tasks.map((task) => (
         <TaskItem
           key={task.id}
-          id={task.id}
-          text={task.text}
+          task={task}
           onDelete={onDelete}
         />
       ))}
