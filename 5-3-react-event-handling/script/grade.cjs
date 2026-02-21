@@ -1,347 +1,651 @@
 #!/usr/bin/env node
+
 /**
- * React Lab – Task Tracker (State + Event Handling)
- * Grader (CommonJS) — flexible, attempt-aware, state-focused
+ * Lab Autograder — React Event Handling Lab (5-3)
  *
- * Grading policy for tasks (out of 80):
- * - No meaningful attempt (no state/events/components wired): 0/80
- * - Attempted (partial):                                     minimum 60/80
- * - Fully complete (all tasks strong):                        award actual earned (up to 80/80)
+ * Repo layout (per your screenshot):
+ * - Workflow runs at repo root (cwd = repo root)
+ * - Project folder: 5-3-react-event-handling/
+ * - Grader file:   5-3-react-event-handling/script/grade.cjs
+ * - Student code:  5-3-react-event-handling/src/components/...
  *
- * Per task: Completeness 8, Correctness 6, Code Quality 6 = 20
- * Submission: 20 (on time) / 10 (late)
- * Report shows Achieved/Missed checks and detailed feedback.
+ * Marking:
+ * - 80 marks for TODOs (React checks) => 4 tasks
+ * - 20 marks for submission timing (deadline-based)
+ *   - On/before deadline => 20/20
+ *   - After deadline     => 10/20
+ *
+ * Deadline: 23 Feb 2026 11:59 PM (Asia/Riyadh, UTC+03:00)
+ *
+ * Notes:
+ * - Ignores JS/JSX comments (so examples inside comments do NOT count).
+ * - Lenient checks only: looks for top-level implementation and key constructs.
+ * - Accepts common equivalents and flexible naming.
  */
 
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 
-// ---------- helpers ----------
-const read = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
-const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
-const has = (txt, pattern) => (txt ? (pattern instanceof RegExp ? pattern.test(txt) : txt.includes(pattern)) : false);
+const ARTIFACTS_DIR = "artifacts";
+const FEEDBACK_DIR = path.join(ARTIFACTS_DIR, "feedback");
+fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
 
-const nowIso = () => new Date().toISOString();
-const getCommitIso = () => {
+/* -----------------------------
+   Deadline (Asia/Riyadh)
+   23 Feb 2026, 11:59 PM
+-------------------------------- */
+const DEADLINE_RIYADH_ISO = "2026-02-23T23:59:00+03:00";
+const DEADLINE_MS = Date.parse(DEADLINE_RIYADH_ISO);
+
+// Submission marks policy
+const SUBMISSION_MAX = 20;
+const SUBMISSION_LATE = 10;
+
+/* -----------------------------
+   TODO marks (out of 80)
+   (You asked me to distribute marks)
+-------------------------------- */
+const tasks = [
+  { id: "t1", name: "Task 1: Capture Input (controlled input + display text)", marks: 20 },
+  { id: "t2", name: "Task 2: Submit + Props + Display List (tasks state + map + render text)", marks: 25 },
+  { id: "t3", name: "Task 3: Delete Task (prop drilling + filter by id)", marks: 20 },
+  { id: "t4", name: "Task 4: Clear All + Placeholder (reset tasks + show placeholder)", marks: 15 },
+];
+
+const STEPS_MAX = tasks.reduce((sum, t) => sum + t.marks, 0); // 80
+const TOTAL_MAX = STEPS_MAX + SUBMISSION_MAX; // 100
+
+/* -----------------------------
+   Helpers
+-------------------------------- */
+function safeRead(filePath) {
   try {
-    const p = process.env.GITHUB_EVENT_PATH;
-    if (p && fs.existsSync(p)) {
-      const payload = JSON.parse(fs.readFileSync(p, "utf8"));
-      const t = payload?.head_commit?.timestamp
-        || payload?.commits?.[payload.commits?.length - 1]?.timestamp
-        || payload?.repository?.pushed_at
-        || payload?.workflow_run?.head_commit?.timestamp;
-      if (t) return new Date(t).toISOString();
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function mdEscape(s) {
+  return String(s).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+function splitMarks(stepMarks, missingCount, totalChecks) {
+  if (missingCount <= 0) return stepMarks;
+  const perItem = stepMarks / totalChecks;
+  const deducted = perItem * missingCount;
+  return Math.max(0, round2(stepMarks - deducted));
+}
+
+/**
+ * Strip JS/JSX comments while trying to preserve strings/templates.
+ * Not a full parser, but robust enough for beginner labs and avoids
+ * counting commented-out code.
+ */
+function stripJsComments(code) {
+  if (!code) return code;
+
+  let out = "";
+  let i = 0;
+
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+
+  while (i < code.length) {
+    const ch = code[i];
+    const next = code[i + 1];
+
+    // Handle string/template boundaries (with escapes)
+    if (!inDouble && !inTemplate && ch === "'" && !inSingle) {
+      inSingle = true;
+      out += ch;
+      i++;
+      continue;
     }
-  } catch {}
+    if (inSingle && ch === "'") {
+      let backslashes = 0;
+      for (let k = i - 1; k >= 0 && code[k] === "\\"; k--) backslashes++;
+      if (backslashes % 2 === 0) inSingle = false;
+      out += ch;
+      i++;
+      continue;
+    }
+
+    if (!inSingle && !inTemplate && ch === '"' && !inDouble) {
+      inDouble = true;
+      out += ch;
+      i++;
+      continue;
+    }
+    if (inDouble && ch === '"') {
+      let backslashes = 0;
+      for (let k = i - 1; k >= 0 && code[k] === "\\"; k--) backslashes++;
+      if (backslashes % 2 === 0) inDouble = false;
+      out += ch;
+      i++;
+      continue;
+    }
+
+    if (!inSingle && !inDouble && ch === "`" && !inTemplate) {
+      inTemplate = true;
+      out += ch;
+      i++;
+      continue;
+    }
+    if (inTemplate && ch === "`") {
+      let backslashes = 0;
+      for (let k = i - 1; k >= 0 && code[k] === "\\"; k--) backslashes++;
+      if (backslashes % 2 === 0) inTemplate = false;
+      out += ch;
+      i++;
+      continue;
+    }
+
+    // If not inside a string/template, strip comments
+    if (!inSingle && !inDouble && !inTemplate) {
+      // line comment
+      if (ch === "/" && next === "/") {
+        i += 2;
+        while (i < code.length && code[i] !== "\n") i++;
+        continue;
+      }
+      // block comment
+      if (ch === "/" && next === "*") {
+        i += 2;
+        while (i < code.length) {
+          if (code[i] === "*" && code[i + 1] === "/") {
+            i += 2;
+            break;
+          }
+          i++;
+        }
+        continue;
+      }
+    }
+
+    out += ch;
+    i++;
+  }
+
+  return out;
+}
+
+function existsFile(p) {
   try {
-    const { execSync } = require("child_process");
-    const iso = execSync("git log -1 --pretty=format:%cI", { encoding: "utf8" }).trim();
-    if (iso) return new Date(iso).toISOString();
-  } catch {}
-  return nowIso();
-};
-const isLate = (dueIso, commitIso) => {
-  try { return new Date(commitIso).getTime() > new Date(dueIso).getTime(); } catch { return false; }
-};
-
-// ---------- robust file discovery ----------
-function findFirstFile(relCandidates, baseCandidates) {
-  for (const base of baseCandidates) {
-    for (const rel of relCandidates) {
-      const p = path.join(base, rel);
-      if (exists(p)) return p;
-    }
+    return fs.existsSync(p) && fs.statSync(p).isFile();
+  } catch {
+    return false;
   }
-  return null;
 }
 
-// likely bases (ordered)
-const BASES = [
-  path.resolve(__dirname, ".."),                        // …/5-3-react-event-handling
-  process.cwd(),                                       // workflow working dir (repo root)
-  path.resolve(process.cwd(), "5-3-react-event-handling"),
-  path.resolve(__dirname),                             // …/script (unlikely, but harmless)
-];
+function listAllFiles(rootDir) {
+  const ignoreDirs = new Set([
+    "node_modules",
+    ".git",
+    ARTIFACTS_DIR,
+    "dist",
+    "build",
+    ".next",
+    ".cache",
+  ]);
 
-const FILES = {
-  app: findFirstFile(
-    ["src/components/TaskApp.jsx", "src/TaskApp.jsx", "TaskApp.jsx"],
-    BASES
-  ),
-  list: findFirstFile(
-    ["src/components/TaskList.jsx", "src/TaskList.jsx", "TaskList.jsx"],
-    BASES
-  ),
-  item: findFirstFile(
-    ["src/components/TaskItem.jsx", "src/TaskItem.jsx", "TaskItem.jsx"],
-    BASES
-  ),
-};
+  const stack = [rootDir];
+  const out = [];
 
-const code = {
-  app: read(FILES.app || ""),
-  list: read(FILES.list || ""),
-  item: read(FILES.item || ""),
-};
-
-// Fixed due date: 6 Oct 2025, 23:59:59 Asia/Riyadh (UTC+03:00)
-const DEFAULT_DUE_ISO = "2025-10-06T23:59:59+03:00";
-const DUE_DATE_ISO = process.env.DUE_DATE || DEFAULT_DUE_ISO;
-
-// ---------- scoring model ----------
-function runChecks(checks, maxPoints) {
-  // Each check: {desc, test: boolean, pts}
-  let earned = 0;
-  const achieved = [];
-  const missed = [];
-  for (const c of checks) {
-    if (c.test) { earned += c.pts; achieved.push(`✅ ${c.desc}`); }
-    else { missed.push(`❌ ${c.desc}`); }
-  }
-  return {
-    earned: Math.min(maxPoints, earned),
-    achieved,
-    missed,
-    passedCount: achieved.length,
-    totalCount: checks.length,
-  };
-}
-
-// ---------- NEW: clearer task section formatting ----------
-function taskSection(name, completeness, correctness, quality, finalScore) {
-  const lines = [];
-
-  // Task heading
-  lines.push(`## ${name}`);
-  lines.push(`**Score:** ${finalScore}/20`);
-  lines.push("");
-
-  // Helper to render each category consistently
-  const renderCategory = (title, detail, max) => {
-    const block = [];
-    block.push(`### ${title} — ${detail.earned}/${max}`);
-    if (detail.achieved.length) {
-      block.push("**What you achieved:**");
-      block.push(...detail.achieved.map(s => `- ${s}`));
-    } else {
-      block.push("_No checks achieved yet._");
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
     }
-    if (detail.missed.length) {
-      block.push("**What to improve:**");
-      block.push(...detail.missed.map(s => `- ${s}`));
-    }
-    block.push(""); // spacer
-    return block.join("\n");
-  };
 
-  // Ordered sections per your request
-  lines.push(renderCategory("Correctness", correctness, 6));
-  lines.push(renderCategory("Completeness", completeness, 8));
-  lines.push(renderCategory("Code Quality", quality, 6));
-
-  return lines.join("\n");
-}
-
-// ---------- Task checks (state-focused, top-level only) ----------
-
-// Common state regexes
-const usesUseState = (name) => has(code.app, new RegExp(`\\[\\s*${name}\\s*,\\s*set${name.replace(/^./, c => c.toUpperCase())}\\s*\\]\\s*=\\s*useState\\s*\\(`));
-const usesTextState = usesUseState("text") || has(code.app, /\[\s*text\s*,\s*setText\s*\]\s*=\s*useState\s*\(/);
-const usesTasksState = usesUseState("tasks") || has(code.app, /\[\s*tasks\s*,\s*setTasks\s*\]\s*=\s*useState\s*\(/);
-
-// Task 1: Capture Input (controlled input with text state)
-const t1Completeness = runChecks([
-  { desc: "An input field is present", test: has(code.app, /<input[^>]*>/i), pts: 2 },
-  { desc: "Input is bound to state via value={text}", test: has(code.app, /value\s*=\s*{?\s*text\s*}?/), pts: 3 },
-  { desc: "Text state declared with useState", test: usesTextState, pts: 3 },
-], 8);
-const t1Correctness = runChecks([
-  { desc: "Input has an onChange handler", test: has(code.app, /onChange\s*=\s*{[^}]+}/), pts: 2 },
-  { desc: "onChange reads e.target.value", test: has(code.app, /(\(|\s)(e|event)\)?\s*=>[\s\S]*?(e|event)\.target\.value/), pts: 2 },
-  { desc: "Current text value is rendered somewhere (preview/paragraph/etc.)", test: has(code.app, /\{?\s*text\s*\}?[^=]*<\/|You typed:|aria-live|preview/i), pts: 2 },
-], 6);
-const t1Quality = runChecks([
-  { desc: "TaskApp component is exported (export default)", test: has(code.app, /export\s+default/), pts: 3 },
-  { desc: "Clean JSX structure around input row", test: has(code.app, /<div\s+className="inputRow">[\s\S]*<\/div>/), pts: 3 },
-], 6);
-
-// Task 2: Submit → Add to tasks state → Render list
-const t2Completeness = runChecks([
-  { desc: "Tasks state declared with useState([])", test: usesTasksState, pts: 3 },
-  { desc: "A Submit button exists with onClick", test: has(code.app, /<button[^>]*>\s*Submit\s*<\/button>/i) && has(code.app, /onClick\s*=\s*{[^}]+}/), pts: 3 },
-  { desc: "TaskList is rendered from TaskApp", test: has(code.app, /<TaskList\b[^>]*>/), pts: 2 },
-], 8);
-const t2Correctness = runChecks([
-  { desc: "Submit adds an object {id, text} immutably (setTasks(prev => [...prev, {...}]))", test: has(code.app, /setTasks\s*\(\s*prev\s*=>\s*\[\s*\.\.\.\s*prev\s*,\s*{[\s\S]*id[\s\S]*text[\s\S]*}\s*\]\s*\)/), pts: 3 },
-  { desc: "Input cleared after submit (setText(\"\") or setText(''))", test: has(code.app, /setText\s*\(\s*(['"])\1\s*\)/), pts: 2 },
-  { desc: "Empty submissions guarded (trim or length check)", test: has(code.app, /\.trim\s*\(\)\s*\)|if\s*\(\s*!?text\s*\)/), pts: 1 },
-], 6);
-const t2Quality = runChecks([
-  { desc: "TaskList and TaskItem exported", test: has(code.list, /export\s+default/) && has(code.item, /export\s+default/), pts: 3 },
-  { desc: "List rendering uses map with a stable key", test: has(code.list, /\.map\s*\(/) && has(code.list, /key\s*=\s*{[^}]+}/), pts: 3 },
-], 6);
-
-// Task 3: Delete Button → Remove from tasks (filter)
-const t3Completeness = runChecks([
-  { desc: "Delete button present in TaskItem", test: has(code.item, /<button[^>]*>(\s*🗑️|[^<]*Delete[^<]*)<\/button>/i), pts: 4 },
-  { desc: "Delete button wired via onClick", test: has(code.item, /onClick\s*=\s*{[^}]+}/), pts: 4 },
-], 8);
-const t3Correctness = runChecks([
-  { desc: "Delete removes matching task using filter / onDelete(id)", test: has(code.app, /setTasks\s*\(\s*prev\s*=>\s*prev\.filter\s*\(\s*\w+\s*=>/) || has(code.item, /onDelete\s*\(\s*id\s*\)|onDelete\(\s*\w+\s*\)/), pts: 6 },
-], 6);
-const t3Quality = runChecks([
-  { desc: "Delete handler is concise and readable", test: has(code.item, /onClick\s*=\s*{\s*\(\)\s*=>|onClick\s*=\s*{\s*\(\s*.*\s*\)\s*=>/), pts: 3 },
-  { desc: "Components exported properly", test: has(code.item, /export\s+default/) || has(code.list, /export\s+default/), pts: 3 },
-], 6);
-
-// Task 4: Clear All → Reset tasks state
-const t4Completeness = runChecks([
-  { desc: "Clear All button exists", test: has(code.app, /<button[^>]*>[^<]*Clear\s*All[^<]*<\/button>/i), pts: 4 },
-  { desc: "Clear All button has onClick handler", test: has(code.app, /onClick\s*=\s*{[^}]+}/), pts: 4 },
-], 8);
-const t4Correctness = runChecks([
-  { desc: "Clear All empties tasks via setTasks([])", test: has(code.app, /setTasks\s*\(\s*\[\s*\]\s*\)/) || has(code.app, /setTasks\s*\(\s*prev\s*=>\s*\[\s*\]\s*\)/), pts: 6 },
-], 6);
-const t4Quality = runChecks([
-  { desc: "Clear handler defined as a simple function/arrow", test: has(code.app, /const\s+\w+\s*=\s*\(\)\s*=>\s*{/) || has(code.app, /function\s+\w+\s*\(/), pts: 3 },
-  { desc: "TaskApp exported", test: has(code.app, /export\s+default/), pts: 3 },
-], 6);
-
-// ---------- compute raw per task ----------
-const perTaskRaw = [
-  { name: "Task 1 (Capture Input with State)", c: t1Completeness, k: t1Correctness, q: t1Quality },
-  { name: "Task 2 (Submit → Add to State → Display)", c: t2Completeness, k: t2Correctness, q: t2Quality },
-  { name: "Task 3 (Delete Task)", c: t3Completeness, k: t3Correctness, q: t3Quality },
-  { name: "Task 4 (Clear All Tasks)", c: t4Completeness, k: t4Correctness, q: t4Quality },
-];
-
-let perTask = perTaskRaw.map(x => ({
-  name: x.name,
-  completeness: x.c.earned,
-  correctness: x.k.earned,
-  quality: x.q.earned,
-  raw: x.c.earned + x.k.earned + x.q.earned,
-  cDetail: x.c,
-  kDetail: x.k,
-  qDetail: x.q,
-}));
-
-let tasksTotalRaw = perTask.reduce((s, t) => s + t.raw, 0);
-
-// ---------- attempt policy (flexible) ----------
-const attemptSignals = [
-  /useState\s*\(/,
-  /value\s*=\s*{[^}]+}/,
-  /onChange\s*=\s*{[^}]+}/,
-  /onClick\s*=\s*{[^}]+}/,
-  /<TaskList\b/,
-  /<TaskItem\b/,
-  /setTasks\s*\(/,
-  /setText\s*\(/,
-];
-const attemptDetected =
-  attemptSignals.some(rx => has(code.app, rx) || has(code.list, rx) || has(code.item, rx));
-
-// Task-level full completion heuristic (for transparency only)
-const t1Full = t1Completeness.earned >= 7 && t1Correctness.earned >= 5;
-const t2Full = t2Completeness.earned >= 7 && t2Correctness.earned >= 5;
-const t3Full = t3Completeness.earned >= 7 && t3Correctness.earned >= 5;
-const t4Full = t4Completeness.earned >= 7 && t4Correctness.earned >= 5;
-const allFull = t1Full && t2Full && t3Full && t4Full;
-
-// Apply flexible policy:
-// - If no meaningful attempt → 0/80 for tasks
-// - If attempted but below 60 → raise to 60/80 (distribute across tasks without mentioning boosts)
-// - If fully complete → show actual earned (no floor)
-const MIN_ATTEMPT_TOTAL = 60;
-let tasksTotalFinal = tasksTotalRaw;
-
-if (!attemptDetected) {
-  tasksTotalFinal = 0;
-  perTask = perTask.map(t => ({ ...t, raw: 0 }));
-} else if (!allFull && tasksTotalRaw < MIN_ATTEMPT_TOTAL) {
-  let deficit = MIN_ATTEMPT_TOTAL - tasksTotalRaw;
-  const room = perTask.map(t => 20 - t.raw);
-  // Distribute small bumps evenly to preserve relative weights
-  while (deficit > 0 && room.some(r => r > 0)) {
-    for (let i = 0; i < perTask.length && deficit > 0; i++) {
-      if (room[i] > 0) {
-        perTask[i].raw += 1;
-        room[i] -= 1;
-        deficit -= 1;
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (!ignoreDirs.has(e.name)) stack.push(full);
+      } else if (e.isFile()) {
+        out.push(full);
       }
     }
   }
-  tasksTotalFinal = perTask.reduce((s, t) => s + t.raw, 0);
+  return out;
 }
 
-// ---------- submission ----------
-const commitIso = getCommitIso();
-const late = isLate(DUE_DATE_ISO, commitIso);
-const submissionPoints = late ? 10 : 20;
+/* -----------------------------
+   IMPORTANT: paths for your repo layout
+   - workflow runs at repo root (cwd = repo root)
+   - project is in: 5-3-react-event-handling
+-------------------------------- */
+const REPO_ROOT = process.cwd();
+const PROJECT_ROOT = path.join(REPO_ROOT, "5-3-react-event-handling");
 
-// ---------- report ----------
-const header = `# Auto Grade Report
+/* -----------------------------
+   Find files (inside PROJECT_ROOT)
+-------------------------------- */
+function findFileByBasename(names) {
+  const preferred = names
+    .flatMap((n) => [
+      path.join(PROJECT_ROOT, "src", "components", n),
+      path.join(PROJECT_ROOT, "src", n),
+    ])
+    .filter((p) => existsFile(p));
+  if (preferred.length) return preferred[0];
 
-**Commit Time:** ${commitIso}
-**Due Date:** ${DUE_DATE_ISO}
-**Submission:** ${submissionPoints}/20 ${late ? "(Late submission detected)" : "(On time)"}
+  const all = listAllFiles(PROJECT_ROOT);
+  const lowerSet = new Set(names.map((x) => x.toLowerCase()));
+  return all.find((p) => lowerSet.has(path.basename(p).toLowerCase())) || null;
+}
 
-**Files detected**
-- TaskApp: ${FILES.app || "NOT FOUND"}
-- TaskList: ${FILES.list || "NOT FOUND"}
-- TaskItem: ${FILES.item || "NOT FOUND"}
+const taskAppFile = findFileByBasename(["TaskApp.jsx", "TaskApp.js"]);
+const taskListFile = findFileByBasename(["TaskList.jsx", "TaskList.js"]);
+const taskItemFile = findFileByBasename(["TaskItem.jsx", "TaskItem.js"]);
+
+/* -----------------------------
+   Determine submission time
+-------------------------------- */
+let lastCommitISO = null;
+let lastCommitMS = null;
+
+try {
+  lastCommitISO = execSync("git log -1 --format=%cI", { encoding: "utf8" }).trim();
+  lastCommitMS = Date.parse(lastCommitISO);
+} catch {
+  // fallback (still grades, but treat as "now")
+  lastCommitISO = new Date().toISOString();
+  lastCommitMS = Date.now();
+}
+
+/* -----------------------------
+   Submission marks
+-------------------------------- */
+const isLate = Number.isFinite(lastCommitMS) ? lastCommitMS > DEADLINE_MS : true;
+const submissionScore = isLate ? SUBMISSION_LATE : SUBMISSION_MAX;
+
+/* -----------------------------
+   Load student files
+-------------------------------- */
+const taskAppRaw = taskAppFile ? safeRead(taskAppFile) : null;
+const taskListRaw = taskListFile ? safeRead(taskListFile) : null;
+const taskItemRaw = taskItemFile ? safeRead(taskItemFile) : null;
+
+const taskApp = taskAppRaw ? stripJsComments(taskAppRaw) : null;
+const taskList = taskListRaw ? stripJsComments(taskListRaw) : null;
+const taskItem = taskItemRaw ? stripJsComments(taskItemRaw) : null;
+
+const results = []; // { id, name, max, score, checklist[], deductions[] }
+
+/* -----------------------------
+   Result helpers
+-------------------------------- */
+function addResult(task, required, missing) {
+  const score = splitMarks(task.marks, missing.length, required.length);
+  results.push({
+    id: task.id,
+    name: task.name,
+    max: task.marks,
+    score,
+    checklist: required.map((r) => `${r.ok ? "✅" : "❌"} ${r.label}`),
+    deductions: missing.length ? missing.map((m) => `Missing: ${m.label}`) : [],
+  });
+}
+
+function failTask(task, reason) {
+  results.push({
+    id: task.id,
+    name: task.name,
+    max: task.marks,
+    score: 0,
+    checklist: [],
+    deductions: [reason],
+  });
+}
+
+/* -----------------------------
+   Light detection helpers
+-------------------------------- */
+function mkHas(code) {
+  return (re) => re.test(code);
+}
+
+function anyOf(has, res) {
+  return res.some((r) => has(r));
+}
+
+/* -----------------------------
+   Grade TODOs (lenient)
+-------------------------------- */
+
+// Task 1: Controlled input + display typed text
+{
+  if (!taskApp) {
+    failTask(
+      tasks[0],
+      taskAppFile
+        ? `Could not read component file at: ${taskAppFile}`
+        : "TaskApp component file not found (expected src/components/TaskApp.jsx)."
+    );
+  } else {
+    const has = mkHas(taskApp);
+
+    const required = [
+      {
+        label: 'Creates text state with useState("") (lenient)',
+        ok: anyOf(has, [
+          /\bconst\s*\[\s*text\s*,\s*setText\s*\]\s*=\s*useState\s*\(\s*["'`]\s*["'`]\s*\)/i,
+          /\buseState\s*\(\s*["'`]\s*["'`]\s*\)/i,
+        ]),
+      },
+      {
+        label: "Input is controlled with value={text} (lenient)",
+        ok: anyOf(has, [/\bvalue\s*=\s*\{\s*text\s*\}/i]),
+      },
+      {
+        label: "Input updates text via onChange -> setText(e.target.value) (lenient)",
+        ok: anyOf(has, [
+          /\bonChange\s*=\s*\{\s*\(\s*\w+\s*\)\s*=>\s*setText\s*\(\s*\w+\s*\.target\.value\s*\)\s*\}/i,
+          /\bonChange\s*=\s*\{\s*handleChange\s*\}/i, // allow helper fn name
+          /\bsetText\s*\(\s*\w+\s*\.target\.value\s*\)/i,
+        ]),
+      },
+      {
+        label: "Displays current text in JSX (e.g., <p>{text}</p>) (lenient)",
+        ok: anyOf(has, [/\{\s*text\s*\}/i]),
+      },
+    ];
+
+    const missing = required.filter((r) => !r.ok);
+    addResult(tasks[0], required, missing);
+  }
+}
+
+// Task 2: tasks state + submit adds {id,text} + clears + pass props + map + render text
+{
+  if (!taskApp || !taskList || !taskItem) {
+    const missingFiles = [];
+    if (!taskApp) missingFiles.push("TaskApp.jsx");
+    if (!taskList) missingFiles.push("TaskList.jsx");
+    if (!taskItem) missingFiles.push("TaskItem.jsx");
+
+    failTask(tasks[1], `Missing key React files: ${missingFiles.join(", ")}.`);
+  } else {
+    const hasA = mkHas(taskApp);
+    const hasL = mkHas(taskList);
+    const hasI = mkHas(taskItem);
+
+    const required = [
+      {
+        label: "Creates tasks state with useState([]) (lenient)",
+        ok: anyOf(hasA, [/\bconst\s*\[\s*tasks\s*,\s*setTasks\s*\]\s*=\s*useState\s*\(\s*\[\s*\]\s*\)/i]),
+      },
+      {
+        label: "handleSubmit adds a new task object to tasks immutably (setTasks([...prev, ...])) (lenient)",
+        ok: anyOf(hasA, [
+          /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
+          /\bsetTasks\s*\(\s*prev\s*=>\s*\[\s*\.\.\.\s*prev\s*,/i,
+          /\bsetTasks\s*\(\s*\[\s*\.\.\.\s*tasks\s*,/i, // less ideal but common
+        ]),
+      },
+      {
+        label: "New task has id + text fields (Date.now or similar) (lenient)",
+        ok: anyOf(hasA, [
+          /\{\s*id\s*:\s*Date\.now\s*\(\s*\)\s*,\s*text\s*:\s*text/i,
+          /\{\s*id\s*:\s*\w+\s*,\s*text\s*:\s*text/i,
+          /\bid\s*:\s*Date\.now/i,
+        ]),
+      },
+      {
+        label: "Clears input after submit (setText('') or setText(\"\")) (lenient)",
+        ok: anyOf(hasA, [/\bsetText\s*\(\s*["'`]\s*["'`]\s*\)/i]),
+      },
+      {
+        label: "Passes tasks to TaskList as props (tasks={tasks}) (lenient)",
+        ok: anyOf(hasA, [/<\s*TaskList[^>]*\btasks\s*=\s*\{\s*tasks\s*\}/i]),
+      },
+      {
+        label: "TaskList maps tasks to TaskItem (tasks.map(...)) (lenient)",
+        ok: anyOf(hasL, [/\btasks\s*\.\s*map\s*\(/i, /\.map\s*\(\s*\(\s*\w+\s*\)\s*=>/i]),
+      },
+      {
+        label: "TaskItem displays the task text (task.text) (lenient)",
+        ok: anyOf(hasI, [/\btask\s*\.\s*text\b/i]),
+      },
+    ];
+
+    const missing = required.filter((r) => !r.ok);
+    addResult(tasks[1], required, missing);
+  }
+}
+
+// Task 3: Delete by id via filter + pass onDelete + TaskItem button calls onDelete(task.id)
+{
+  if (!taskApp || !taskList || !taskItem) {
+    const missingFiles = [];
+    if (!taskApp) missingFiles.push("TaskApp.jsx");
+    if (!taskList) missingFiles.push("TaskList.jsx");
+    if (!taskItem) missingFiles.push("TaskItem.jsx");
+
+    failTask(tasks[2], `Missing key React files: ${missingFiles.join(", ")}.`);
+  } else {
+    const hasA = mkHas(taskApp);
+    const hasL = mkHas(taskList);
+    const hasI = mkHas(taskItem);
+
+    const required = [
+      {
+        label: "Defines a delete handler that filters tasks by id (lenient)",
+        ok: anyOf(hasA, [
+          /\bhandleDelete\b/i,
+          /\bsetTasks\s*\(\s*\(\s*prev\s*\)\s*=>\s*prev\s*\.\s*filter\s*\(/i,
+          /\bfilter\s*\(\s*\w+\s*=>\s*\w+\.id\s*!==\s*id\s*\)/i,
+        ]),
+      },
+      {
+        label: "Passes onDelete to TaskList (onDelete={handleDelete}) (lenient)",
+        ok: anyOf(hasA, [/<\s*TaskList[^>]*\bonDelete\s*=\s*\{\s*handleDelete\s*\}/i]),
+      },
+      {
+        label: "TaskList passes onDelete to TaskItem (onDelete={onDelete}) (lenient)",
+        ok: anyOf(hasL, [/<\s*TaskItem[^>]*\bonDelete\s*=\s*\{\s*onDelete\s*\}/i]),
+      },
+      {
+        label: "TaskItem delete button calls onDelete(task.id) (lenient)",
+        ok: anyOf(hasI, [
+          /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*task\s*\.\s*id\s*\)\s*\}/i,
+          /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*onDelete\s*\(\s*\w+\s*\)\s*\}/i, // very lenient
+        ]),
+      },
+    ];
+
+    const missing = required.filter((r) => !r.ok);
+    addResult(tasks[2], required, missing);
+  }
+}
+
+// Task 4: Clear all + placeholder when no tasks
+{
+  if (!taskApp || !taskList) {
+    const missingFiles = [];
+    if (!taskApp) missingFiles.push("TaskApp.jsx");
+    if (!taskList) missingFiles.push("TaskList.jsx");
+
+    failTask(tasks[3], `Missing key React files: ${missingFiles.join(", ")}.`);
+  } else {
+    const hasA = mkHas(taskApp);
+    const hasL = mkHas(taskList);
+
+    const required = [
+      {
+        label: "Clear All handler resets tasks to empty array (setTasks([])) (lenient)",
+        ok: anyOf(hasA, [/\bsetTasks\s*\(\s*\[\s*\]\s*\)/i]),
+      },
+      {
+        label: "Clear All button wired to handler (onClick={handleClearAll}) (lenient)",
+        ok: anyOf(hasA, [/\bonClick\s*=\s*\{\s*handleClearAll\s*\}/i]),
+      },
+      {
+        label: "TaskList shows placeholder when tasks is empty (lenient)",
+        ok: anyOf(hasL, [
+          /\btasks\s*\.\s*length\s*===\s*0/i,
+          /!\s*tasks\s*\.\s*length/i,
+          /tasks\s*\?\s*.*:\s*/i, // ternary exists
+          /\bNo\s+tasks\b/i,
+          /\bplaceholder\b/i,
+        ]),
+      },
+    ];
+
+    const missing = required.filter((r) => !r.ok);
+    addResult(tasks[3], required, missing);
+  }
+}
+
+/* -----------------------------
+   Final scoring
+-------------------------------- */
+const stepsScore = results.reduce((sum, r) => sum + r.score, 0);
+const totalScore = round2(stepsScore + submissionScore);
+
+/* -----------------------------
+   Build summary + feedback (same style)
+-------------------------------- */
+const LAB_NAME = "5-3-react-event-main";
+
+const submissionLine = `- **Lab:** ${LAB_NAME}
+- **Deadline (Riyadh / UTC+03:00):** ${DEADLINE_RIYADH_ISO}
+- **Last commit time (from git log):** ${lastCommitISO}
+- **Submission marks:** **${submissionScore}/${SUBMISSION_MAX}** ${isLate ? "(Late submission)" : "(On time)"}
 `;
 
-// NOTE: use real newlines ("\n"), not escaped "\\n"
-const sections = perTask.map(t => {
-  return taskSection(
-    t.name,
-    t.cDetail,
-    t.kDetail,
-    t.qDetail,
-    t.raw // final per-task score shown; no mention of boosts
-  );
-}).join("\n\n");
+let summary = `# ${LAB_NAME} — Autograding Summary
 
-const totals = `
-## Totals
-- Tasks Total: **${tasksTotalFinal}/80**
-- Submission: **${submissionPoints}/20**
-- **Grand Total: ${tasksTotalFinal + submissionPoints}/100**
+## Submission
+
+${submissionLine}
+
+## Files Checked
+
+- Repo root: ${REPO_ROOT}
+- Project root: ${PROJECT_ROOT}
+- TaskApp: ${taskAppFile ? `✅ ${taskAppFile}` : "❌ TaskApp.jsx not found"}
+- TaskList: ${taskListFile ? `✅ ${taskListFile}` : "❌ TaskList.jsx not found"}
+- TaskItem: ${taskItemFile ? `✅ ${taskItemFile}` : "❌ TaskItem.jsx not found"}
+
+## Marks Breakdown
+
+| Component | Marks |
+|---|---:|
 `;
 
-const report = `${header}\n${sections}\n\n${totals}\n`;
+for (const r of results) summary += `| ${r.name} | ${r.score}/${r.max} |\n`;
+summary += `| Submission (timing) | ${submissionScore}/${SUBMISSION_MAX} |\n`;
 
-// Student-friendly JSON (keeps detected file paths for debugging)
-const json = {
-  commitIso,
-  dueDateIso: DUE_DATE_ISO,
-  late,
-  submissionPoints,
-  files: FILES,
-  tasks: perTask.map(t => ({
-    name: t.name,
-    final: t.raw,
-    achieved: {
-      completeness: t.cDetail.achieved,
-      correctness: t.kDetail.achieved,
-      quality: t.qDetail.achieved,
-    },
-    missed: {
-      completeness: t.cDetail.missed,
-      correctness: t.kDetail.missed,
-      quality: t.qDetail.missed,
-    },
-  })),
-  tasksTotal: tasksTotalFinal,
-  grandTotal: tasksTotalFinal + submissionPoints,
-  attemptDetected,
-  allTasksFullyComplete: allFull,
-};
+summary += `
+## Total Marks
 
-try { fs.writeFileSync("grade-report.md", report, "utf8"); } catch {}
-try { fs.writeFileSync("grade.json", JSON.stringify(json, null, 2), "utf8"); } catch {}
-try { fs.writeFileSync("grader.js", fs.readFileSync(__filename, "utf8"), "utf8"); } catch {}
-console.log(report);
+**${totalScore} / ${TOTAL_MAX}**
+
+## Detailed Checks (What you did / missed)
+`;
+
+for (const r of results) {
+  const done = (r.checklist || []).filter((x) => x.startsWith("✅"));
+  const missed = (r.checklist || []).filter((x) => x.startsWith("❌"));
+
+  summary += `
+<details>
+  <summary><strong>${mdEscape(r.name)}</strong> — ${r.score}/${r.max}</summary>
+
+  <br/>
+
+  <strong>✅ Found</strong>
+  ${done.length ? "\n" + done.map((x) => `- ${mdEscape(x)}`).join("\n") : "\n- (Nothing detected)"}
+
+  <br/><br/>
+
+  <strong>❌ Missing</strong>
+  ${missed.length ? "\n" + missed.map((x) => `- ${mdEscape(x)}`).join("\n") : "\n- (Nothing missing)"}
+
+  <br/><br/>
+
+  <strong>❗ Deductions / Notes</strong>
+  ${
+    r.deductions && r.deductions.length
+      ? "\n" + r.deductions.map((d) => `- ${mdEscape(d)}`).join("\n")
+      : "\n- No deductions."
+  }
+
+</details>
+`;
+}
+
+summary += `
+> Full feedback is also available in: \`artifacts/feedback/README.md\`
+`;
+
+let feedback = `# ${LAB_NAME} — Feedback
+
+## Submission
+
+${submissionLine}
+
+## Files Checked
+
+- Repo root: ${REPO_ROOT}
+- Project root: ${PROJECT_ROOT}
+- TaskApp: ${taskAppFile ? `✅ ${taskAppFile}` : "❌ TaskApp.jsx not found"}
+- TaskList: ${taskListFile ? `✅ ${taskListFile}` : "❌ TaskList.jsx not found"}
+- TaskItem: ${taskItemFile ? `✅ ${taskItemFile}` : "❌ TaskItem.jsx not found"}
+
+---
+
+## TODO-by-TODO Feedback
+`;
+
+for (const r of results) {
+  feedback += `
+### ${r.name} — **${r.score}/${r.max}**
+
+**Checklist**
+${r.checklist.length ? r.checklist.map((x) => `- ${x}`).join("\n") : "- (No checks available)"}
+
+**Deductions / Notes**
+${r.deductions.length ? r.deductions.map((d) => `- ❗ ${d}`).join("\n") : "- ✅ No deductions. Good job!"}
+`;
+}
+
+feedback += `
+---
+
+## How marks were deducted (rules)
+
+- JS/JSX comments are ignored (so examples in comments do NOT count).
+- Checks are intentionally light: they look for key constructs and basic structure.
+- Code can be in ANY order; repeated code is allowed.
+- Common equivalents are accepted, and naming is flexible.
+- Missing required items reduce marks proportionally within that TODO.
+`;
+
+/* -----------------------------
+   Write outputs
+-------------------------------- */
+if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+
+const csv = `student,score,max_score
+all_students,${totalScore},${TOTAL_MAX}
+`;
+
+fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
+fs.writeFileSync(path.join(ARTIFACTS_DIR, "grade.csv"), csv);
+fs.writeFileSync(path.join(FEEDBACK_DIR, "README.md"), feedback);
+
+console.log(
+  `✔ Lab graded: ${totalScore}/${TOTAL_MAX} (Submission: ${submissionScore}/${SUBMISSION_MAX}, TODOs: ${stepsScore}/${STEPS_MAX}).`
+);

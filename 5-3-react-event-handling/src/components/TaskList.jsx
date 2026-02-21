@@ -1,13 +1,17 @@
 import React from "react";
 import TaskItem from "./TaskItem";
 
-export default function TaskList({ tasks, onDelete }) {
+export default function TaskList({ tasks = [], onDelete }) {
   return (
     <ul className="list">
-      {/* Task 2 – Display Placeholder if No Tasks Yet */}
+      {/* TODO (Task 2): if tasks.length === 0 show a placeholder message */}
 
-      {/* Task 2 & 3 – Map tasks to TaskItem */}
-      
+      {/* TODO (Task 2 & 3): map tasks to TaskItem
+          Example shape:
+          tasks.map((task) => (
+            <TaskItem key={task.id} task={task} onDelete={onDelete} />
+          ))
+      */}
     </ul>
   );
 }

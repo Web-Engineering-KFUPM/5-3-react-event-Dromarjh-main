@@ -1,17 +1,18 @@
 import React from "react";
- 
+
 export default function TaskItem({ task, onDelete }) {
   return (
     <li className="item">
-      {/* Task 2 – Display Task Text */}
-      <span className="item__text">{/* TODO: render text */}</span>
-      {/* Task 3 – Delete Button */}
+      {/* TODO (Task 2): render task text */}
+      <span className="item__text">{/* task.text */}</span>
+
       <div className="item__actions">
         <button
           className="iconBtn iconBtn--danger"
           aria-label="Delete task"
           title="Delete"
-          // TODO: onClick={() => onDelete(id)}
+          // TODO (Task 3): call onDelete(task.id) when clicked
+          // onClick={() => onDelete(task.id)}
         >
           🗑️
         </button>

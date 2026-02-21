@@ -109,6 +109,7 @@ Hints:
       <button onClick={handleClearAll}>Clear All</button>
  
 */
+
 import TaskApp from "./components/TaskApp";
 import "./index.css";
 
