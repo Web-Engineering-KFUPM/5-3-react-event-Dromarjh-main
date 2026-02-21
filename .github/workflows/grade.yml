@@ -1,4 +1,4 @@
-name: 5-2-react-starter-main
+name: 5-3-react-event-handling
 
 on:
   push:
@@ -19,12 +19,12 @@ jobs:
           node-version: "20"
 
       - name: Run autograder
-        run: node 5-3-react-event-main/scripts/grader.cjs
+        run: node 5-3-react-event-handling/scripts/grader.cjs
 
       - name: Upload grading artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: 5-3-react-event-main
+          name: 5-3-react-event-handling
           path: |
             artifacts/grade.csv
             artifacts/feedback/README.md
