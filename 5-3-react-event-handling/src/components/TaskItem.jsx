@@ -1,22 +1,20 @@
 import React from "react";
 
-export default function TaskItem({ task, onDelete }) {
+export default function TaskItem({ id, text, onDelete }) {
   return (
-    <li className="item">
-      {/* TODO (Task 2): render task text */}
-      <span className="item__text">{/* task.text */}</span>
+    <li className="taskItem">
+      {/* Task 2: show the text inside the <span> */}
+      <span>{text}</span>
 
-      <div className="item__actions">
-        <button
-          className="iconBtn iconBtn--danger"
-          aria-label="Delete task"
-          title="Delete"
-          // TODO (Task 3): call onDelete(task.id) when clicked
-          // onClick={() => onDelete(task.id)}
-        >
-          🗑️
-        </button>
-      </div>
+      {/* TODO (Task 3): add onClick handler to Delete button */}
+      {/* When clicked, call onDelete(id) */}
+      <button
+        className="btn btn--danger"
+        onClick={() => onDelete(id)}
+      >
+        Delete
+      </button>
     </li>
   );
 }
+

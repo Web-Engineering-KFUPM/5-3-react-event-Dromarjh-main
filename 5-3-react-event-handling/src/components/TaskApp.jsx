@@ -13,14 +13,31 @@ export default function TaskApp() {
     // 1) prevent empty submit using text.trim()
     // 2) add new task object { id, text } into tasks (immutably)
     // 3) clear input (setText(""))
+
+    const trimmed = text.trim();
+
+    if (!trimmed) return;
+
+    const newTask = {
+      id: Date.now(),
+      text: trimmed,
+    };
+
+    setTasks((prev) => [...prev, newTask]);
+
+    setText("");
   };
 
   const handleDelete = (id) => {
     // TODO (Task 3): remove task by id using filter (immutably)
+
+    setTasks((prev) => prev.filter((task) => task.id !== id));
   };
 
   const handleClearAll = () => {
     // TODO (Task 4): setTasks([])
+
+    setTasks([]);
   };
 
   return (
@@ -33,6 +50,8 @@ export default function TaskApp() {
           // TODO (Task 1): make this a controlled input:
           // value={text}
           // onChange={(e) => setText(e.target.value)}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSubmit();
           }}
@@ -44,6 +63,7 @@ export default function TaskApp() {
 
       {/* TODO (Task 1): display the current text below the input */}
       {/* <p>{text}</p> */}
+      <p>{text}</p>
 
       {/* Pass tasks and onDelete to TaskList */}
       <TaskList tasks={tasks} onDelete={handleDelete} />
