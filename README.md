@@ -1,7 +1,12 @@
 # React Lab – Task Tracker (Event Handling)
 
-⚠️ **Note:** Please follow the `app.jsx` file to implement the TODOs.
-This README file is only for the **overview of the lab** and the **concepts used**.
+> **Note:**
+> Please follow the `app.jsx` file to implement the TODOs.
+>
+> Please use app.jsx file to perform TODOs and follow the steps strictly to gain good marks in the assignment.  
+>  
+> **Due Date:** 23 Feb, 2026, **11:59 PM**
+
 
 ## Lab Overview
 
@@ -21,8 +26,8 @@ By combining **state** and **event handling**, your Task Tracker will become ful
 
 ## Read Assignment
 Review the section on event handling in React:  
-[5.8 Event Handling](https://learn.zybooks.com/zybook/SWE363Fall2025/chapter/5/section/8)<br>
-[5.9 State](https://learn.zybooks.com/zybook/SWE363Fall2025/chapter/5/section/9)
+- 5.8 Event Handling
+- 5.9 State
 
 ---
 
@@ -144,44 +149,6 @@ You can use the state variable directly inside your JSX or component logic:
 ---
 
 By understanding state and event handling, you’ll be able to create components that respond to user input and update automatically when data changes.
-
-## Understanding the map() Function in React
-
-In this lab, you will see the `.map()` function used to render a list of tasks.  
-This function is a very common way to display multiple items dynamically in React.
-
-### What is map()?
-- `.map()` is a JavaScript array method.  
-- It loops over each element in an array and applies a function to it.  
-- It returns a **new array** with the results of that function.  
-
-### Syntax
-```javascript
-array.map((element, index) => {
-  // return something for each element
-});
-```
-
-### Parameters
-- **element** → The current item in the array (for example, a task string like `"Make group"`).  
-- **index** → The position of the item in the array (0 for the first item, 1 for the second, etc.).  
-
-### Example in React
-```jsx
-{props.tasks.map((t, i) => (
-  <TaskItem key={i} text={t} />
-))}
-```
-
-### Explanation of Example
-- `props.tasks` is an array that contains all the tasks.  
-- `t` represents the current task (e.g., `"Prepare proposal"`).  
-- `i` represents the index of that task in the array.  
-- For each task in the array, we return a `<TaskItem />` component.  
-- The `key={i}` is required by React to uniquely identify each list item and optimize rendering.  
-- The task text (`t`) is passed as a prop into `<TaskItem />`.  
-
----
 
 ## Checklist Before Lab Submission
 

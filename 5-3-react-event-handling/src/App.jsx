@@ -18,7 +18,12 @@ Setup
 4. To see the output, start the development server by running:  
    npm run dev  
 
-Note: In order to gain good marks in the lab, please follow the lab instructions strictly.  
+Note: If you get an error like “running scripts is disabled” or
+      the system blocks npm commands, run this first:
+         Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+      Then re-run your npm commands.
+
+In order to gain good marks in the lab, please follow the lab instructions strictly.  
 
 ------------------------------------------------------------
 Task to write int the input field
@@ -102,15 +107,7 @@ Hints:
 - You can add a function like handleClearAll in TaskApp and attach it to the button’s onClick.
    Example idea:
       <button onClick={handleClearAll}>Clear All</button>
-
-Extra Hints:
-- Each task should have a unique key (use task.id) when rendering in a list.
-- You can submit by pressing the Enter key — check onKeyDown for "Enter".
-- Don’t mutate the original tasks array — always return a new array from setTasks.
-- Keep your components small:
-   - TaskApp → holds state and handlers.
-   - TaskList → renders the list.
-   - TaskItem → displays a single task and Delete button.  
+ 
 */
 import TaskApp from "./components/TaskApp";
 import "./index.css";
